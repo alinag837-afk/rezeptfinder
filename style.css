@@ -1,0 +1,173 @@
+body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.container{max-width:950px;margin:40px auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.06)}.box{margin-bottom:30px;padding:20px;background:#f7faff;border:1px solid #e2e8f0;border-radius:10px}.versteckt{display:none}.version,.hinweis{color:#666;font-size:14px}.start-buttons{text-align:center}.start-buttons button{min-width:180px}.formular-gruppe{margin-top:20px;padding:15px;background:white;border-radius:10px}.formular-gruppe h3{margin-top:0;color:#2d7ff9}input,select,textarea{width:100%;margin-top:10px;padding:12px;font-size:16px;box-sizing:border-box}textarea{min-height:80px}button{margin-top:15px;margin-right:8px;padding:10px 16px;font-size:15px;cursor:pointer;border:none;border-radius:8px;background:#2d7ff9;color:white;transition:.15s}button:hover{background:#1d63c8}button:disabled{background:#999}.meldung{display:none;padding:12px;margin-bottom:20px;border-radius:8px;background:#e7f5e7;color:#1b5e20}.meldung.fehler{background:#fdecea;color:#b00020}.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:15px;margin-top:15px}.dashboard-card{background:white;padding:15px;border-radius:10px;text-align:center}.dashboard-card h3{margin:0;font-size:32px;color:#2d7ff9}.dashboard-card p{margin-top:8px;color:#555}.schnellfilter{margin-top:20px;padding-top:15px;border-top:1px solid #d0dff5}.schnellfilter button,.kategorie-buttons button{background:white;color:#2d7ff9;border:1px solid #2d7ff9;border-radius:999px}.schnellfilter button:hover,.kategorie-buttons button:hover,.kategorie-kachel.aktiv{background:#2d7ff9;color:white}.kategorie-buttons{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}.kategorie-buttons button{margin:0}.zutatengruppe{background:#f8fbff;border:1px solid #dce8f8;border-radius:10px;padding:12px;margin-top:15px}.zutatengruppe-kopf{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.zutaten-zeile{display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:8px;margin-top:10px}.zutaten-zeile input,.zutaten-zeile select,.zutatengruppe-kopf input{margin-top:0}.zutaten-zeile button,.zutatengruppe-kopf button{margin-top:0;background:#b00020}.rezept{margin-top:15px;border-left:4px solid #2d7ff9;background:white;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.04)}.rezept-kopf{padding:15px;cursor:pointer}.rezept-kopf:hover{background:#f0f6ff}.rezept-kopf h2{margin:0 0 5px}.rezept-details{display:none;padding:0 15px 15px}.rezept.offen .rezept-details{display:block}.kategorie-label{color:#555;font-size:14px}.zutaten-gruppe-anzeige{margin-bottom:12px}.zutaten-gruppe-anzeige h4{margin-bottom:5px}.fehlend{color:#b00020}.vorhanden{color:#137333}.abgehakt{text-decoration:line-through;color:#888}.bewertung{margin-top:15px}.stern-button{background:none;color:#f5a400;font-size:24px;padding:0 3px;margin:0}.stern-button:hover{background:none;transform:scale(1.1)}.zutat-ersetzen-box{margin-top:20px;padding:12px;background:#eef7ee;border-radius:8px}#einkaufsliste li{margin-bottom:8px}.kochmodus{margin-top:20px;padding:15px;background:#fff7e6;border-radius:10px}.kochschritt{margin-bottom:12px;padding:10px;background:white;border-radius:8px}.kochschritt input{width:auto;margin-right:8px}.kochschritt p{margin-left:25px;color:#555}.timer-box{margin-top:10px;margin-left:25px}.timer-box input{width:140px}.timer-box span{margin-left:10px;font-weight:bold}.timer-meldung{margin-top:8px;font-weight:bold}.timer-fertig{color:#b00020}#undoButton{position:fixed;bottom:20px;right:20px;background:#ff9800;color:white;z-index:1000}.rezept-details button{margin-bottom:6px}footer{margin-top:30px;text-align:center;color:#777;font-size:14px}@media(max-width:600px){.container{margin:0;border-radius:0;padding:15px}.zutaten-zeile,.zutatengruppe-kopf{grid-template-columns:1fr}button{width:100%;margin-right:0;min-height:44px}input,select,textarea{min-height:44px;font-size:16px}.kategorie-buttons{display:grid;grid-template-columns:1fr 1fr}}
+
+
+.rezept-des-tages {
+  margin-top: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+
+
+
+
+
+
+
+
+
+
+.assistent-vorschau {
+  margin-top: 20px;
+  padding: 15px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.assistent-vorschau h3 {
+  margin-top: 0;
+}
+
+
+
+
+
+
+
+
+
+
+.kategorien-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 15px 0;
+}
+
+.kategorien-grid button {
+  margin: 0;
+}
+
+
+.such-kategorie-kachel {
+  background: white;
+  color: #2d7ff9;
+  border: 1px solid #2d7ff9;
+  border-radius: 999px;
+}
+
+.such-kategorie-kachel.aktiv,
+.such-kategorie-kachel:hover {
+  background: #2d7ff9;
+  color: white;
+}
+
+
+.zubereitung-gross {
+  min-height: 220px;
+  resize: vertical;
+}
+
+
+.treffer-anzeige {
+  margin-top: 12px;
+  font-weight: bold;
+  color: #2d7ff9;
+}
+
+
+.naehrwerte-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.naehrwerte-box {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f3f7ff;
+}
+
+
+.naehrwert-rechner {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #dbeafe;
+}
+
+.naehrwert-ergebnis {
+  margin-top: 10px;
+}
+
+
+.naehrwert-tags {
+  margin-top: 10px;
+}
+
+.tag-chip {
+  display: inline-block;
+  margin: 4px 4px 0 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e8f1ff;
+  color: #1d4ed8;
+  font-size: 0.9rem;
+}
+
+
+.auto-backup-box {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+}
+
+.auto-backup-eintrag {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+
+#suchTagInput {
+  min-height: 120px;
+}
+
+
+.cloud-status {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #eef6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.cloud-status .button-gruppe {
+  margin-top: 8px;
+}
+
+
+.offline-status {
+  margin-top: 8px;
+  font-size: 0.95rem;
+}
+
+.cloud-backup-panel {
+  margin-top: 12px;
+}
+
+.cloud-backup-eintrag {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid #dbeafe;
+}

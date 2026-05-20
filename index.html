@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rezeptfinder v1.33 Cloud Offline</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="container">
+  <h1>Rezeptfinder</h1>
+  <div id="meldung" class="meldung"></div>
+
+  <section class="box" id="dashboard">
+    <h2>Übersicht</h2>
+    <div class="dashboard-grid">
+      <div class="dashboard-card"><h3 id="anzahlRezepte">0</h3><p>Rezepte</p></div>
+      <div class="dashboard-card"><h3 id="anzahlFavoriten">0</h3><p>Favoriten</p></div>
+      <div class="dashboard-card"><h3 id="durchschnittBewertung">0</h3><p>Ø Bewertung</p></div>
+      <div class="dashboard-card"><h3 id="anzahlKategorien">0</h3><p>Kategorien</p></div>
+    </div>
+    <p id="letztesRezept"></p>
+    <p id="backupHinweis"></p>
+    <p id="dashboardDebug" class="hinweis"></p>
+    <p class="version">Rezeptfinder v1.33 Cloud Offline</p>
+    <div id="cloudStatusBox" class="cloud-status">
+      <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
+      <div class="button-gruppe">
+        <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
+        <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
+      
+        <div class="button-gruppe">
+          <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
+          <button type="button" onclick="offlineSyncJetzt()">Offline-Daten synchronisieren</button>
+        </div>
+        <div id="offlineStatusText" class="offline-status"></div>
+        <div id="cloudBackupPanel" class="cloud-backup-panel"></div>
+      </div>
+    <div id="rezeptDesTagesBox" class="rezept-des-tages"></div>
+  </section>
+
+  <section class="box start-buttons">
+    <h2>Was möchtest du machen?</h2>
+    <button onclick="rezeptSucheToggle()">Rezepte suchen</button>
+    <button onclick="rezeptHinzufuegenToggle()">Rezept hinzufügen</button>
+    <button onclick="alleRezepteToggle()">Alle Rezepte anzeigen</button>
+    <button onclick="hauptbereichToggle('einkaufBereich')">Einkaufsliste</button>
+    
+    <button onclick="rezeptAssistentToggle()">Rezept-Assistent</button>
+    <button onclick="hauptbereichToggle('datenpruefungBereich', false, false, true)">Rezepte prüfen</button>
+</section>
+
+  
+<section class="box versteckt" id="sucheBereich">
+  <h2>Alle Rezepte anzeigen</h2>
+  <p>Wähle aus, welche Kategorien angezeigt werden sollen. Du kannst die Liste auch nach Quelle sortieren.</p>
+
+  <div id="kategorienFilter" class="kategorien-grid kategorie-buttons">
+    <button class="kategorie-kachel aktiv" data-kategorie="" onclick="kategorieKachelUmschalten(this)">Alle</button>
+    <button class="kategorie-kachel" data-kategorie="Nicht zugeordnet" onclick="kategorieKachelUmschalten(this)">Nicht zugeordnet</button>
+    <button class="kategorie-kachel" data-kategorie="Kalte Vorspeisen" onclick="kategorieKachelUmschalten(this)">Kalte Vorspeisen</button>
+    <button class="kategorie-kachel" data-kategorie="Suppen" onclick="kategorieKachelUmschalten(this)">Suppen</button>
+    <button class="kategorie-kachel" data-kategorie="Warme Vorspeisen" onclick="kategorieKachelUmschalten(this)">Warme Vorspeisen</button>
+    <button class="kategorie-kachel" data-kategorie="Salate" onclick="kategorieKachelUmschalten(this)">Salate</button>
+    <button class="kategorie-kachel" data-kategorie="Saucen und Aufstriche" onclick="kategorieKachelUmschalten(this)">Saucen & Aufstriche</button>
+    <button class="kategorie-kachel" data-kategorie="Hauptspeisen Fleisch" onclick="kategorieKachelUmschalten(this)">Hauptspeisen Fleisch</button>
+    <button class="kategorie-kachel" data-kategorie="Hauptspeisen Fisch" onclick="kategorieKachelUmschalten(this)">Hauptspeisen Fisch</button>
+    <button class="kategorie-kachel" data-kategorie="Hauptspeisen vegetarisch" onclick="kategorieKachelUmschalten(this)">Hauptspeisen vegetarisch</button>
+    <button class="kategorie-kachel" data-kategorie="Beilagen" onclick="kategorieKachelUmschalten(this)">Beilagen</button>
+    <button class="kategorie-kachel" data-kategorie="Dessert" onclick="kategorieKachelUmschalten(this)">Dessert</button>
+    <button class="kategorie-kachel" data-kategorie="Kuchen und Torten" onclick="kategorieKachelUmschalten(this)">Kuchen & Torten</button>
+    <button class="kategorie-kachel" data-kategorie="Bäckerei" onclick="kategorieKachelUmschalten(this)">Bäckerei</button>
+    <button class="kategorie-kachel" data-kategorie="Kekse" onclick="kategorieKachelUmschalten(this)">Kekse</button>
+    <button class="kategorie-kachel" data-kategorie="Brot" onclick="kategorieKachelUmschalten(this)">Brot</button>
+    <button class="kategorie-kachel" data-kategorie="Teige" onclick="kategorieKachelUmschalten(this)">Teige</button>
+    <button class="kategorie-kachel" data-kategorie="Eis" onclick="kategorieKachelUmschalten(this)">Eis</button>
+    <button class="kategorie-kachel" data-kategorie="Getränke" onclick="kategorieKachelUmschalten(this)">Getränke</button>
+    <button class="kategorie-kachel" data-kategorie="Haltbar machen" onclick="kategorieKachelUmschalten(this)">Haltbar machen</button>
+    <button class="kategorie-kachel" data-kategorie="Gewürze" onclick="kategorieKachelUmschalten(this)">Gewürze</button>
+    <button class="kategorie-kachel" data-kategorie="Marmeladen und Saucen" onclick="kategorieKachelUmschalten(this)">Marmeladen & Saucen</button>
+    <button class="kategorie-kachel" data-kategorie="Sirup" onclick="kategorieKachelUmschalten(this)">Sirup</button>
+    <button class="kategorie-kachel" data-kategorie="Pralinen" onclick="kategorieKachelUmschalten(this)">Pralinen</button>
+    <button class="kategorie-kachel" data-kategorie="Sonstiges" onclick="kategorieKachelUmschalten(this)">Sonstiges</button>
+    <button class="kategorie-kachel" data-kategorie="Airfryer" onclick="kategorieKachelUmschalten(this)">Airfryer</button>
+  </div>
+
+  <label for="sortierungInput">Sortierung</label>
+  <select id="sortierungInput">
+    <option value="name">Alphabetisch</option>
+    
+    <option value="bewertung">Beste Bewertung</option>
+    <option value="neu">Neueste zuerst</option>
+  </select>
+
+  <div class="button-gruppe">
+    <button onclick="filterAnwenden()">Alle anzeigen</button>
+    <button onclick="kategorienAufAlleSetzen()">Alle Kategorien auswählen</button>
+    <button onclick="sucheZuruecksetzen()">Zurücksetzen</button>
+  </div>
+</section>
+
+
+  <section class="box versteckt" id="formularBereich">
+    <h2>Neues Rezept hinzufügen / bearbeiten</h2>
+    <div class="formular-gruppe"><h3>Grunddaten</h3>
+      <input id="nameInput" placeholder="Rezeptname">
+      <select id="kategorieInput"></select>
+      <select id="schwierigkeitInput"><option value="">Schwierigkeit leer lassen</option><option>Einfach</option><option>Mittel</option><option>Schwer</option></select>
+      <input id="zubereitungszeitInput" placeholder="Zubereitungszeit, z. B. 30 min">
+      <input id="quelleInput" list="quellenListe" placeholder="Quelle">
+        <datalist id="quellenListe"></datalist>
+    </div>
+    <div class="formular-gruppe"><h3>Zutaten & Portionen</h3>
+      <input id="portionenInput" type="number" min="1" placeholder="Grundportionen, z. B. 4">
+      <p class="hinweis">Zutaten können Gruppen haben, z. B. Teig, Fülle, Glasur.</p>
+      <div id="zutatenGruppen"></div>
+      <button type="button" onclick="zutatenGruppeHinzufuegen()">Zutatengruppe hinzufügen</button>
+    </div>
+    <div class="formular-gruppe"><h3>Besondere Utensilien / Utensilien</h3><textarea id="utensilienInput" placeholder="z. B. Pfanne, Schneebesen"></textarea></div>
+    <div class="formular-gruppe"><h3>Zubereitung</h3><textarea id="zubereitungInput" class="zubereitung-gross" placeholder="Jeden Schritt mit Punkt trennen."></textarea></div>
+    <div class="formular-gruppe">
+      <div class="formular-gruppe" id="naehrwerteBereich">
+        <h3>Nährwerte pro 100 g</h3>
+
+        <div class="naehrwerte-grid">
+          <div>
+            <label for="kalorienInput">Kalorien pro 100 g (kcal)</label>
+            <input type="number" id="kalorienInput" placeholder="z. B. 420">
+          </div>
+
+          <div>
+            <label for="eiweissInput">Eiweiß pro 100 g (g)</label>
+            <input type="number" step="0.1" id="eiweissInput" placeholder="z. B. 12">
+          </div>
+
+          <div>
+            <label for="kohlenhydrateInput">Kohlenhydrate pro 100 g (g)</label>
+            <input type="number" step="0.1" id="kohlenhydrateInput" placeholder="z. B. 35">
+          </div>
+
+          <div>
+            <label for="fettInput">Fett pro 100 g (g)</label>
+            <input type="number" step="0.1" id="fettInput" placeholder="z. B. 18">
+          </div>
+
+          <div>
+            <label for="zuckerInput">Zucker pro 100 g (g)</label>
+            <input type="number" step="0.1" id="zuckerInput" placeholder="optional">
+          </div>
+
+          <div>
+            <label for="ballaststoffeInput">Ballaststoffe pro 100 g (g)</label>
+            <input type="number" step="0.1" id="ballaststoffeInput" placeholder="optional">
+          </div>
+
+          <div>
+            <label for="salzInput">Salz pro 100 g (g)</label>
+            <input type="number" step="0.1" id="salzInput" placeholder="optional">
+          </div>
+        </div>
+      </div>
+
+        <h3>Zusatzinfos</h3><textarea id="notizenInput" placeholder="Notizen"></textarea><textarea id="tagsInput" list="tagsListe" placeholder="Tags, mit Komma getrennt"></textarea></div>
+    <button type="button" onclick="rezeptSpeichernDirektCloud()">Rezept speichern</button>
+    <button onclick="formularLeeren()">Formular leeren</button>
+  </section>
+
+  <section class="box versteckt" id="einkaufBereich">
+    <h2>Einkaufsliste</h2>
+    <p>Füge Zutaten direkt aus einem Rezept hinzu. Danach kannst du hier die Liste erstellen, als PDF speichern oder zurücksetzen.</p>
+<button onclick="einkaufslisteDrucken()">Download / PDF</button>
+    <button onclick="einkaufslisteZuruecksetzen()">Einkaufsliste zurücksetzen</button>
+    <ul id="einkaufsliste"></ul>
+  </section>
+
+  
+
+
+<section class="box versteckt" id="rezeptSucheBereich">
+  <h2>Rezepte suchen</h2>
+  <p>Suche gezielt nach Rezeptname, Zutaten, Tags, Quelle oder Kategorien.</p>
+
+  <label for="suchNameInput">Rezeptname</label>
+  <input type="text" id="suchNameInput" placeholder="z. B. Apfelstrudel">
+
+  <label for="suchZutatenInput">Zutaten</label>
+  <input type="text" id="suchZutatenInput" placeholder="z. B. Mehl, Milch, Butter">
+
+  <label for="suchTagInput">Tags</label>
+  <select id="suchTagInput" multiple size="6">
+  </select>
+  <small>Du kannst mehrere Tags auswählen.</small>
+
+  <label for="suchQuelleInput">Quelle</label>
+  <select id="suchQuelleInput">
+    <option value="">Alle Quellen</option>
+  </select>
+
+  <h3>Kategorien</h3>
+  <div id="suchKategorieKacheln" class="kategorien-grid kategorie-buttons"></div>
+
+  <label for="suchSortierungInput">Sortierung</label>
+  <select id="suchSortierungInput">
+    <option value="name">Alphabetisch</option>
+    
+    <option value="bewertung">Beste Bewertung</option>
+    <option value="kategorie">Kategorie</option>
+  </select>
+
+  <div class="button-gruppe">
+    <button onclick="rezeptSucheAusfuehren()">Suchen</button>
+    <button onclick="rezeptSucheZuruecksetzen()">Suche löschen</button>
+  </div>
+
+  <p id="suchTrefferAnzeige" class="treffer-anzeige"></p>
+</section>
+
+
+
+<section class="box versteckt" id="textImportBereich">
+      <h2>Rezept-Assistent</h2>
+      <p>Füge hier ein Rezept aus GoodNotes, Notizen oder einer Webseite ein. Der Assistent versucht Zutaten, Gruppen, Schritte und Utensilien zu erkennen.</p>
+
+      <textarea
+        id="textImportInput"
+        placeholder="Beispiel:
+
+Apfelstrudel
+
+Zutaten:
+Teig:
+250 g Mehl
+1 EL Öl
+125 ml Wasser
+
+Fülle:
+4 Stk Äpfel
+2 EL Zucker
+1 TL Zimt
+
+Zubereitung:
+Teig kneten.
+Äpfel schneiden.
+Fülle auf den Teig geben.
+30 min backen."
+      ></textarea>
+
+      <button id="rezeptAnalysierenButton" type="button" onclick="rezeptAnalysierenDirekt()">Rezept analysieren</button>
+      <button id="rezeptAssistentResetButton" type="button" onclick="rezeptAssistentZuruecksetzen()">Zurücksetzen</button>
+
+      <div id="assistentVorschau" class="assistent-vorschau"></div>
+    </section>
+
+
+  <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
+  <section id="ergebnisse"></section>
+  <footer>Rezeptfinder v1.33 Cloud Offline</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="script.js"></script>
+
+<select id="bewertungFilter" class="versteckt"><option value=""></option></select>
+<div id="schnellfilterInhalt" class="versteckt"></div>
+<button id="undoButton" class="versteckt" type="button"></button>
+</body>
+</html>
