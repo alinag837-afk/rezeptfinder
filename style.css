@@ -203,3 +203,11 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   background: #fef3c7;
   color: #92400e;
 }
+
+.rezept-karte {
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 14px;
+  background: white;
+  border: 1px solid #e2e8f0;
+}
