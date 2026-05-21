@@ -357,3 +357,65 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   margin-top: 14px;
   margin-bottom: 6px;
 }
+
+
+/* VERSION 1.49 echte Umsetzungen */
+.einkauf-auswahl-gruppe {
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.einkauf-auswahl-item {
+  display: block;
+  margin-top: 7px;
+}
+
+.kochkarte h4 {
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+.rechner-box,
+.kochmodus-box,
+.einkauf-detail-box {
+  margin-top: 18px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+}
+
+.zubereitung-nummeriert li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.stern-button {
+  border: none;
+  background: transparent;
+  font-size: 1.35rem;
+  cursor: pointer;
+}
+.stern-button.aktiv { color: #d97706; }
+
+.detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.detail-meta-grid > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+}
+.detail-meta-grid strong {
+  display:block;
+  color:#475569;
+  font-size:0.85rem;
+  margin-bottom:4px;
+}
