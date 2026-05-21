@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v1.35.4 Cloud</title>
+  <title>Rezeptfinder v1.36 Cloud</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,7 +22,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v1.35.4 Cloud</p>
+    <p class="version">Rezeptfinder v1.36 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -106,6 +106,14 @@
       <input id="nameInput" placeholder="Rezeptname">
       <select id="kategorieInput"></select>
       <select id="schwierigkeitInput"><option value="">Schwierigkeit leer lassen</option><option>Einfach</option><option>Mittel</option><option>Schwer</option></select>
+<div class="form-gruppe">
+<label for="ausprobiertInput">Status</label>
+<select id="ausprobiertInput">
+<option value="false" selected>Noch nicht ausprobiert</option>
+<option value="true">Schon ausprobiert</option>
+</select>
+</div>
+
       <input id="zubereitungszeitInput" placeholder="Zubereitungszeit, z. B. 30 min">
       <input id="quelleInput" list="quellenListe" placeholder="Quelle">
         <datalist id="quellenListe"></datalist>
@@ -255,7 +263,7 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
   <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v1.35.4 Cloud</footer>
+  <footer>Rezeptfinder v1.36 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
