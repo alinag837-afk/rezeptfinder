@@ -211,3 +211,129 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   background: white;
   border: 1px solid #e2e8f0;
 }
+
+
+/* VERSION 1.46 Komfortlayout */
+.rezept-detail-modern {
+  max-width: 960px;
+  margin: 16px auto;
+}
+
+.detail-topbar,
+.detail-actions,
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.detail-meta-grid > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.detail-meta-grid strong {
+  display: block;
+  color: #475569;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.rechner-box,
+.kochmodus-box,
+.einkauf-detail-box {
+  margin-top: 18px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+}
+
+.rechner-ergebnis {
+  margin-top: 10px;
+}
+
+.zubereitung-nummeriert li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.stern-button {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.stern-button.aktiv {
+  color: #d97706;
+}
+
+.kochkarte {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 10px;
+}
+
+.tag-suche-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.tag-filter-chip {
+  border: 1px solid #cbd5e1;
+  background: white;
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.tag-filter-chip.aktiv {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.tag-select-hidden-modern {
+  display: none;
+}
+
+#einkaufsliste {
+  list-style: none;
+  padding-left: 0;
+}
+
+.einkauf-item {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.einkauf-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.abgehakt-item {
+  opacity: 0.65;
+}
