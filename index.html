@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v1.54 Cloud</title>
+  <title>Rezeptfinder v1.55 Cloud</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,7 +22,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v1.54 Cloud</p>
+    <p class="version">Rezeptfinder v1.55 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -169,7 +169,7 @@
       </div>
 
         <h3>Zusatzinfos</h3><textarea id="notizenInput" placeholder="Notizen"></textarea><textarea id="tagsInput" list="tagsListe" placeholder="Tags, mit Komma getrennt"></textarea></div>
-    <button type="button" onclick="rezeptSpeichernDirektCloud()">Rezept speichern</button>
+    <button type="button" onclick="rf155RezeptSpeichern()">Rezept speichern</button>
     <button onclick="formularLeeren()">Formular leeren</button>
   </section>
 
@@ -271,7 +271,7 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
   <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v1.54 Cloud</footer>
+  <footer>Rezeptfinder v1.55 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
