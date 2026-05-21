@@ -419,3 +419,25 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   font-size:0.85rem;
   margin-bottom:4px;
 }
+
+
+/* VERSION 1.50 Rezept-Assistent Vorschau */
+.assistent-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.assistent-preview-grid p,
+.assistent-preview-group {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.primary-button {
+  margin-top: 14px;
+  font-weight: 700;
+}
