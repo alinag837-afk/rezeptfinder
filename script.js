@@ -166,7 +166,7 @@ function einkaufslisteDrucken(){const list=einkaufZusammenfassen(datenLaden("ein
 function portionenBerechnen(i){const r=rezepte[i],ziel=Number(v(`zielPortionen-${i}`)),out=document.getElementById(`portionenErgebnis-${i}`);out.innerHTML="";if(!ziel||!r.portionen){meldungAnzeigen("Bitte Portionen prüfen.",true);return}const f=ziel/r.portionen;(r.zutatenGruppen||[]).forEach(g=>{const div=document.createElement("div");div.className="zutaten-gruppe-anzeige";div.innerHTML=`<h4>${esc(g.name)}</h4><ul>${(g.zutaten||[]).map(z=>`<li>${zutatUmrechnen(z,f)}</li>`).join("")}</ul>`;out.appendChild(div)})}function zutatUmrechnen(z,f){const d=zutatAnalysieren(z);if(!d.menge||!d.einheit)return`⚠️ ${esc(zutatAlsText(z))} konnte nicht berechnet werden`;return`${mengeMitSchoenerEinheit(d.menge*f,d.basisEinheit)} ${d.name}`}
 function kochmodusStarten(i){const r=rezepte[i],box=document.getElementById(`kochmodus-${i}`),sch=zubereitungsSchritte(r.zubereitung);box.innerHTML=`<h3>Kochmodus</h3><button onclick="kochmodusZuruecksetzen(${i})">Kochmodus zurücksetzen</button><h4>Besondere Utensilien / Utensilien</h4><p>${(r.utensilien||[]).join(", ")||"keine"}</p><h4>Zutaten</h4>${zutatenGruppenHtml(r)}<h4>Schritte</h4><div id="kochschritte-${i}"></div>`;const ziel=box.querySelector(`#kochschritte-${i}`),fort=datenLaden(`kochfortschritt-${r.id}`,[]);sch.forEach((s,si)=>{const zut=zutatenFuerSchrittFinden(zutatenAusRezept(r),s),ut=utensilienFuerSchrittFinden(r.utensilien||[],s),div=document.createElement("div");div.className="kochschritt";div.innerHTML=`<label><input type="checkbox" onchange="kochschrittAbhaken(this,${i},${si})"><span><strong>Schritt ${si+1}:</strong> ${esc(s)}</span></label>${timerHtmlErstellen(s,i,si)}${zut.length?`<p><strong>Benötigte Zutaten:</strong> ${zut.map(z=>z.text).join(", ")}</p>`:""}${ut.length?`<p><strong>Benötigte Utensilien:</strong> ${ut.join(", ")}</p>`:""}`;ziel.appendChild(div);if(fort.includes(si)){div.querySelector("input").checked=true;div.querySelector("span").classList.add("abgehakt")}})}function kochschrittAbhaken(cb,i,si){const r=rezepte[i],key=`kochfortschritt-${r.id}`;let f=datenLaden(key,[]);cb.nextElementSibling.classList.toggle("abgehakt",cb.checked);if(cb.checked&&!f.includes(si))f.push(si);if(!cb.checked)f=f.filter(x=>x!==si);datenSpeichern(key,f)}function kochmodusZuruecksetzen(i){localStorage.removeItem(`kochfortschritt-${rezepte[i].id}`);kochmodusStarten(i)}function zutatenFuerSchrittFinden(zutaten,schritt){const sn=norm(schritt);return zutaten.map((z,i)=>{const d=zutatAnalysieren(z),n=norm(d.name);return{index:i,text:zutatAlsText(z),such:[n,...zutatenSuchwoerter(n)]}}).filter(z=>z.such.some(w=>sn.includes(norm(w))))}function utensilienFuerSchrittFinden(ut,schritt){const sn=norm(schritt);return ut.filter(u=>sn.includes(norm(u)))}function zutatenSuchwoerter(n){const g=[["parmesan","kaese","käse"],["mozzarella","kaese","käse"],["spaghetti","nudeln","pasta"],["eier","ei"],["tomaten","tomate"],["kartoffeln","kartoffel"],["zwiebeln","zwiebel"]];let s=[n];g.forEach(a=>{if(a.map(norm).includes(norm(n)))s.push(...a)});return[...new Set(s)]}
 function timerHtmlErstellen(s,i,si){const z=zeitAusTextFinden(s);if(!z)return"";return`<div class="timer-box"><input id="timer-wert-${i}-${si}" value="${z.original}"><button id="timer-start-${i}-${si}" onclick="timerManuellStarten(${i},${si})">Timer starten</button><button id="timer-stop-${i}-${si}" onclick="timerStoppen(${i},${si})" style="display:none">Stoppen</button><span id="timer-anzeige-${i}-${si}"></span><div id="timer-meldung-${i}-${si}" class="timer-meldung"></div></div>`}function timerManuellStarten(i,si){const sek=zeitZuSekunden(v(`timer-wert-${i}-${si}`).toLowerCase());if(!sek){meldungAnzeigen("Bitte gültige Zeit eingeben.",true);return}timerStartenMitZeit(i,si,sek)}function timerStartenMitZeit(i,si,sek){const id=`${i}-${si}`,a=document.getElementById(`timer-anzeige-${id}`),start=document.getElementById(`timer-start-${id}`),stop=document.getElementById(`timer-stop-${id}`),m=document.getElementById(`timer-meldung-${id}`);if(timerListe[id])clearInterval(timerListe[id]);start.disabled=true;stop.style.display="inline-block";m.textContent="";timerListe[id]=setInterval(()=>{const min=Math.floor(sek/60),s=sek%60;a.textContent=`${min.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;if(sek<=0){clearInterval(timerListe[id]);start.disabled=false;stop.style.display="none";m.textContent="⏰ Timer fertig!";m.classList.add("timer-fertig");timerTonAbspielen();return}sek--},1000)}function timerStoppen(i,si){const id=`${i}-${si}`;if(timerListe[id])clearInterval(timerListe[id]);document.getElementById(`timer-anzeige-${id}`).textContent="Timer gestoppt.";document.getElementById(`timer-start-${id}`).disabled=false;document.getElementById(`timer-stop-${id}`).style.display="none"}function timerTonAbspielen(){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.2;o.start();setTimeout(()=>{o.stop();c.close()},800)}catch{}}
-function rezepteExportieren(){const blob=new Blob([JSON.stringify({app:"rezeptfinder",version: 1.56432,exportDatum:new Date().toISOString(),rezepte},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`rezepte-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();localStorage.setItem("letztesBackupDatum",new Date().toISOString());dashboardAktualisieren()}function rezepteImportieren(){const file=document.getElementById("importDatei").files[0];if(!file){meldungAnzeigen("Bitte Datei auswählen.",true);return}const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.rezepte)throw 0;rezepte=d.rezepte;datenstrukturReparieren();dashboardAktualisieren();meldungAnzeigen("Import abgeschlossen.")}catch{meldungAnzeigen("Ungültige Backup-Datei.",true)}};r.readAsText(file)}function backupHinweisAktualisieren(){const e=document.getElementById("backupHinweis"),d=localStorage.getItem("letztesBackupDatum");if(!d){e.textContent="Noch kein Backup erstellt.";return}const tage=Math.floor((new Date()-new Date(d))/(864e5));e.textContent=tage>=7?`Letztes Backup vor ${tage} Tagen. Bitte wieder exportieren.`:`Letztes Backup vor ${tage} Tagen.`}function alleDatenLoeschen(){if(!confirm("Wirklich alle Daten löschen?"))return;rezepte=[];speichern();datenSpeichern("einkaufsliste",[]);dashboardAktualisieren();
+function rezepteExportieren(){const blob=new Blob([JSON.stringify({app:"rezeptfinder",version: 1.57432,exportDatum:new Date().toISOString(),rezepte},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`rezepte-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();localStorage.setItem("letztesBackupDatum",new Date().toISOString());dashboardAktualisieren()}function rezepteImportieren(){const file=document.getElementById("importDatei").files[0];if(!file){meldungAnzeigen("Bitte Datei auswählen.",true);return}const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.rezepte)throw 0;rezepte=d.rezepte;datenstrukturReparieren();dashboardAktualisieren();meldungAnzeigen("Import abgeschlossen.")}catch{meldungAnzeigen("Ungültige Backup-Datei.",true)}};r.readAsText(file)}function backupHinweisAktualisieren(){const e=document.getElementById("backupHinweis"),d=localStorage.getItem("letztesBackupDatum");if(!d){e.textContent="Noch kein Backup erstellt.";return}const tage=Math.floor((new Date()-new Date(d))/(864e5));e.textContent=tage>=7?`Letztes Backup vor ${tage} Tagen. Bitte wieder exportieren.`:`Letztes Backup vor ${tage} Tagen.`}function alleDatenLoeschen(){if(!confirm("Wirklich alle Daten löschen?"))return;rezepte=[];speichern();datenSpeichern("einkaufsliste",[]);dashboardAktualisieren();
 rezeptDesTagesAufStartseite();document.getElementById("ergebnisse").innerHTML=""}
 function rezeptDrucken(i){const r=rezepte[i],f=window.open("","_blank");f.document.write(`<!doctype html><html><head><meta charset="UTF-8"><title>${r.name}</title><style>body{font-family:Arial;padding:40px;line-height:1.6}.rezeptkarte{max-width:800px;margin:auto}.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.info-box{border:1px solid #ddd;padding:10px;border-radius:8px;background:#f8f8f8}h2{border-bottom:2px solid #ddd;padding-bottom:5px}li{margin-bottom:8px}</style></head><body><div class="rezeptkarte"><h1>${r.name}</h1><p>${r.kategorie}</p><div class="info-grid"><div class="info-box"><b>Portionen:</b><br>${r.portionen||"nicht angegeben"}</div><div class="info-box"><b>Schwierigkeit:</b><br>${r.schwierigkeit||"nicht angegeben"}</div><div class="info-box"><b>Zeit:</b><br>${r.zubereitungszeit||"nicht angegeben"}</div><div class="info-box"><b>Quelle:</b><br>${r.quelle||"nicht angegeben"}</div></div><h2>Utensilien</h2><p>${(r.utensilien||[]).join(", ")||"keine"}</p><h2>Zutaten</h2>${zutatenGruppenHtml(r)}<h2>Zubereitung</h2><ol>${zubereitungsSchritte(r.zubereitung).map(s=>`<li>${s}</li>`).join("")}</ol>${r.notizen?`<h2>Notizen</h2><p>${r.notizen}</p>`:""}</div><script>window.print()<\/script></body></html>`);f.document.close()}
 function rezeptTextAnalysieren(){const d=rezeptTextParsen(v("textImportInput"));bereichAnzeigen("formularBereich");document.getElementById("nameInput").value=d.name;document.getElementById("kategorieInput").value=d.kategorie;document.getElementById("portionenInput").value=d.portionen;document.getElementById("schwierigkeitInput").value=d.schwierigkeit;document.getElementById("zubereitungszeitInput").value=d.zubereitungszeit;document.getElementById("quelleInput").value=d.quelle;document.getElementById("utensilienInput").value=d.utensilien.join(", ");document.getElementById("zubereitungInput").value=d.zubereitung.join(". ");document.getElementById("notizenInput").value=d.notizen;document.getElementById("tagsInput").value=d.tags.join(", ");zutatenGruppenInsFormularLaden(d.zutatenGruppen)}function rezeptTextParsen(text){const zeilen=text.split("\n").map(x=>x.trim()).filter(Boolean),d={name:"",kategorie:"Nicht zugeordnet",portionen:"",schwierigkeit:"",zubereitungszeit:"",quelle:"",utensilien:[],tags:[],zutatenGruppen:[],zubereitung:[],notizen:""};let bereich="",gruppe=null;zeilen.forEach(z=>{const k=z.toLowerCase();if(k.startsWith("name:")){d.name=wert(z);return}if(k.startsWith("kategorie:")){d.kategorie=wert(z);return}if(k.startsWith("portionen:")){d.portionen=wert(z);return}if(k.startsWith("schwierigkeit:")){d.schwierigkeit=wert(z);return}if(k.startsWith("zubereitungszeit:")){d.zubereitungszeit=wert(z);return}if(k.startsWith("quelle:")){d.quelle=wert(z);return}if(k.startsWith("utensilien:")){d.utensilien=wert(z).split(",").map(x=>textTitel(x.trim())).filter(Boolean);return}if(k.startsWith("tags:")){d.tags=wert(z).split(",").map(x=>x.trim()).filter(Boolean);return}if(k==="zutaten:"){bereich="zutaten";return}if(k==="zubereitung:"){bereich="zubereitung";return}if(k==="notizen:"){bereich="notizen";return}if(bereich==="zutaten"){if(z.endsWith(":")){gruppe={name:z.slice(0,-1),zutaten:[]};d.zutatenGruppen.push(gruppe);return}if(!gruppe){gruppe={name:"Zutaten",zutaten:[]};d.zutatenGruppen.push(gruppe)}gruppe.zutaten.push(zutatNormalisieren(z))}if(bereich==="zubereitung")d.zubereitung.push(z.replace(/\.$/,""));if(bereich==="notizen")d.notizen+=(d.notizen?"\n":"")+z});if(!d.name&&zeilen[0])d.name=zeilen[0];if(!d.zutatenGruppen.length)d.zutatenGruppen=[{name:"Zutaten",zutaten:[]}];return d}function wert(z){return z.split(":").slice(1).join(":").trim()}
@@ -16126,3 +16126,207 @@ window.addEventListener("load", function () {
     }
   });
 });
+
+
+
+// =====================================================
+// VERSION 1.57: Suche repariert - Tags lesbar + Kategorie exakt
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function norm157(value) {
+    return String(value == null ? "" : value)
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  }
+
+  function aktiveKategorien157() {
+    const aktive = [];
+
+    // Kachel-Variante
+    document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel.aktiv, .such-kategorie-kachel.aktiv, .kategorie-kachel.aktiv")
+      .forEach(el => {
+        const wert =
+          (el.dataset && (el.dataset.kategorie || el.dataset.value)) ||
+          el.getAttribute("data-kategorie") ||
+          el.getAttribute("data-value") ||
+          el.textContent;
+        if (wert) aktive.push(String(wert).trim());
+      });
+
+    // Select-Variante, falls vorhanden
+    ["suchKategorieInput", "kategorieSucheInput", "filterKategorieInput"].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      if (el.multiple) {
+        Array.from(el.selectedOptions || []).forEach(o => {
+          if (o.value) aktive.push(o.value);
+        });
+      } else if (el.value) {
+        aktive.push(el.value);
+      }
+    });
+
+    return [...new Set(aktive.filter(Boolean))];
+  }
+
+  function statusPasst157(rezept) {
+    const el = $("suchAusprobiertInput");
+    if (!el || el.value === "") return true;
+    return el.value === "true" ? !!rezept.ausprobiert : !rezept.ausprobiert;
+  }
+
+  function namePasst157(rezept) {
+    const el = $("suchNameInput");
+    const q = el ? norm157(el.value) : "";
+    if (!q) return true;
+    return norm157(rezept.name).includes(q);
+  }
+
+  function quellePasst157(rezept) {
+    const el = $("suchQuelleInput");
+    const q = el ? String(el.value || "").trim() : "";
+    if (!q) return true;
+    return String(rezept.quelle || "Nicht zugeordnet").trim() === q;
+  }
+
+  function tagsPassen157(rezept) {
+    const select = $("suchTagInput");
+    if (!select) return true;
+
+    const ausgewaehlt = Array.from(select.selectedOptions || [])
+      .map(o => norm157(o.value))
+      .filter(Boolean);
+
+    if (!ausgewaehlt.length) return true;
+
+    const rezeptTags = (rezept.tags || []).map(norm157);
+    return ausgewaehlt.every(tag => rezeptTags.includes(tag));
+  }
+
+  function zutatenPassen157(rezept) {
+    const el = $("suchZutatenInput");
+    const q = el ? norm157(el.value) : "";
+    if (!q) return true;
+
+    const teile = q.split(",").map(x => x.trim()).filter(Boolean);
+    const zutatenText = [
+      ...(rezept.zutaten || []).map(z => z.name || ""),
+      ...((rezept.zutatenGruppen || []).flatMap(g => (g.zutaten || []).map(z => z.name || "")))
+    ].join(" ").toLowerCase();
+
+    return teile.every(t => zutatenText.includes(t));
+  }
+
+  function kategoriePasst157(rezept) {
+    const aktive = aktiveKategorien157();
+    if (!aktive.length) return true;
+
+    const rezeptKategorie = norm157(rezept.kategorie || "Nicht zugeordnet");
+    return aktive.map(norm157).includes(rezeptKategorie);
+  }
+
+  function sortiere157(liste) {
+    const sort = $("suchSortierungInput") ? $("suchSortierungInput").value : "name";
+    const out = [...liste];
+
+    if (sort === "bewertung") {
+      out.sort((a, b) => Number(b.bewertung || 0) - Number(a.bewertung || 0));
+    } else if (sort === "kategorie") {
+      out.sort((a, b) => String(a.kategorie || "").localeCompare(String(b.kategorie || "")));
+    } else {
+      out.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    }
+
+    return out;
+  }
+
+  function sucheBerechnen157() {
+    const basis = (Array.isArray(rezepte) ? rezepte : []).map((r, index) => {
+      if (typeof r.ausprobiert === "undefined") r.ausprobiert = false;
+      return { ...r, index };
+    });
+
+    return sortiere157(basis.filter(r =>
+      namePasst157(r) &&
+      quellePasst157(r) &&
+      tagsPassen157(r) &&
+      zutatenPassen157(r) &&
+      statusPasst157(r) &&
+      kategoriePasst157(r)
+    ));
+  }
+
+  function sucheAnzeigen157() {
+    const ergebnisse = sucheBerechnen157();
+    letzteSuchErgebnisse = ergebnisse;
+
+    if (typeof zeigeErgebnisse === "function") {
+      zeigeErgebnisse(ergebnisse);
+    }
+
+    const treffer = $("suchTrefferAnzeige");
+    if (treffer) treffer.textContent = `${ergebnisse.length} Treffer`;
+
+    return ergebnisse;
+  }
+
+  window.rezeptSucheAusfuehren = function () {
+    return sucheAnzeigen157();
+  };
+  rezeptSucheAusfuehren = window.rezeptSucheAusfuehren;
+
+  window.filterAnwenden = function () {
+    return sucheAnzeigen157();
+  };
+  filterAnwenden = window.filterAnwenden;
+
+  // Kategorie-Klicks neu binden: genau eine aktive Kategorie pro Klick,
+  // nochmaliger Klick hebt Auswahl auf.
+  function bindKategorie157() {
+    const kacheln = Array.from(document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel, .such-kategorie-kachel, .kategorie-kachel"));
+    kacheln.forEach(kachel => {
+      if (kachel.dataset.rf157Bound === "1") return;
+      kachel.dataset.rf157Bound = "1";
+
+      kachel.addEventListener("click", function () {
+        const warAktiv = kachel.classList.contains("aktiv");
+        kacheln.forEach(k => k.classList.remove("aktiv"));
+
+        if (!warAktiv) {
+          kachel.classList.add("aktiv");
+        }
+
+        sucheAnzeigen157();
+      });
+    });
+  }
+
+  // Tag-Chips nachfärben und klickbar halten
+  function tagChipsStylen157() {
+    document.querySelectorAll(".tag-filter-chip, .tag-chip, .tags span").forEach(chip => {
+      chip.style.background = chip.classList.contains("aktiv") ? "#dbeafe" : "#ffffff";
+      chip.style.color = "#1e293b";
+      chip.style.border = chip.classList.contains("aktiv") ? "1px solid #2563eb" : "1px solid #cbd5e1";
+    });
+  }
+
+  const alteTagAktualisierung157 = typeof suchTagsDropdownAktualisieren === "function" ? suchTagsDropdownAktualisieren : null;
+  window.suchTagsDropdownAktualisieren = function () {
+    if (alteTagAktualisierung157) {
+      try { alteTagAktualisierung157(); } catch (e) { console.warn("Tag Dropdown alt fehlgeschlagen:", e); }
+    }
+    setTimeout(tagChipsStylen157, 0);
+  };
+  suchTagsDropdownAktualisieren = window.suchTagsDropdownAktualisieren;
+
+  window.addEventListener("load", function () {
+    bindKategorie157();
+    tagChipsStylen157();
+    setTimeout(bindKategorie157, 500);
+    setTimeout(tagChipsStylen157, 500);
+  });
+})();
