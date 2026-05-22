@@ -166,7 +166,7 @@ function einkaufslisteDrucken(){const list=einkaufZusammenfassen(datenLaden("ein
 function portionenBerechnen(i){const r=rezepte[i],ziel=Number(v(`zielPortionen-${i}`)),out=document.getElementById(`portionenErgebnis-${i}`);out.innerHTML="";if(!ziel||!r.portionen){meldungAnzeigen("Bitte Portionen prüfen.",true);return}const f=ziel/r.portionen;(r.zutatenGruppen||[]).forEach(g=>{const div=document.createElement("div");div.className="zutaten-gruppe-anzeige";div.innerHTML=`<h4>${esc(g.name)}</h4><ul>${(g.zutaten||[]).map(z=>`<li>${zutatUmrechnen(z,f)}</li>`).join("")}</ul>`;out.appendChild(div)})}function zutatUmrechnen(z,f){const d=zutatAnalysieren(z);if(!d.menge||!d.einheit)return`⚠️ ${esc(zutatAlsText(z))} konnte nicht berechnet werden`;return`${mengeMitSchoenerEinheit(d.menge*f,d.basisEinheit)} ${d.name}`}
 function kochmodusStarten(i){const r=rezepte[i],box=document.getElementById(`kochmodus-${i}`),sch=zubereitungsSchritte(r.zubereitung);box.innerHTML=`<h3>Kochmodus</h3><button onclick="kochmodusZuruecksetzen(${i})">Kochmodus zurücksetzen</button><h4>Besondere Utensilien / Utensilien</h4><p>${(r.utensilien||[]).join(", ")||"keine"}</p><h4>Zutaten</h4>${zutatenGruppenHtml(r)}<h4>Schritte</h4><div id="kochschritte-${i}"></div>`;const ziel=box.querySelector(`#kochschritte-${i}`),fort=datenLaden(`kochfortschritt-${r.id}`,[]);sch.forEach((s,si)=>{const zut=zutatenFuerSchrittFinden(zutatenAusRezept(r),s),ut=utensilienFuerSchrittFinden(r.utensilien||[],s),div=document.createElement("div");div.className="kochschritt";div.innerHTML=`<label><input type="checkbox" onchange="kochschrittAbhaken(this,${i},${si})"><span><strong>Schritt ${si+1}:</strong> ${esc(s)}</span></label>${timerHtmlErstellen(s,i,si)}${zut.length?`<p><strong>Benötigte Zutaten:</strong> ${zut.map(z=>z.text).join(", ")}</p>`:""}${ut.length?`<p><strong>Benötigte Utensilien:</strong> ${ut.join(", ")}</p>`:""}`;ziel.appendChild(div);if(fort.includes(si)){div.querySelector("input").checked=true;div.querySelector("span").classList.add("abgehakt")}})}function kochschrittAbhaken(cb,i,si){const r=rezepte[i],key=`kochfortschritt-${r.id}`;let f=datenLaden(key,[]);cb.nextElementSibling.classList.toggle("abgehakt",cb.checked);if(cb.checked&&!f.includes(si))f.push(si);if(!cb.checked)f=f.filter(x=>x!==si);datenSpeichern(key,f)}function kochmodusZuruecksetzen(i){localStorage.removeItem(`kochfortschritt-${rezepte[i].id}`);kochmodusStarten(i)}function zutatenFuerSchrittFinden(zutaten,schritt){const sn=norm(schritt);return zutaten.map((z,i)=>{const d=zutatAnalysieren(z),n=norm(d.name);return{index:i,text:zutatAlsText(z),such:[n,...zutatenSuchwoerter(n)]}}).filter(z=>z.such.some(w=>sn.includes(norm(w))))}function utensilienFuerSchrittFinden(ut,schritt){const sn=norm(schritt);return ut.filter(u=>sn.includes(norm(u)))}function zutatenSuchwoerter(n){const g=[["parmesan","kaese","käse"],["mozzarella","kaese","käse"],["spaghetti","nudeln","pasta"],["eier","ei"],["tomaten","tomate"],["kartoffeln","kartoffel"],["zwiebeln","zwiebel"]];let s=[n];g.forEach(a=>{if(a.map(norm).includes(norm(n)))s.push(...a)});return[...new Set(s)]}
 function timerHtmlErstellen(s,i,si){const z=zeitAusTextFinden(s);if(!z)return"";return`<div class="timer-box"><input id="timer-wert-${i}-${si}" value="${z.original}"><button id="timer-start-${i}-${si}" onclick="timerManuellStarten(${i},${si})">Timer starten</button><button id="timer-stop-${i}-${si}" onclick="timerStoppen(${i},${si})" style="display:none">Stoppen</button><span id="timer-anzeige-${i}-${si}"></span><div id="timer-meldung-${i}-${si}" class="timer-meldung"></div></div>`}function timerManuellStarten(i,si){const sek=zeitZuSekunden(v(`timer-wert-${i}-${si}`).toLowerCase());if(!sek){meldungAnzeigen("Bitte gültige Zeit eingeben.",true);return}timerStartenMitZeit(i,si,sek)}function timerStartenMitZeit(i,si,sek){const id=`${i}-${si}`,a=document.getElementById(`timer-anzeige-${id}`),start=document.getElementById(`timer-start-${id}`),stop=document.getElementById(`timer-stop-${id}`),m=document.getElementById(`timer-meldung-${id}`);if(timerListe[id])clearInterval(timerListe[id]);start.disabled=true;stop.style.display="inline-block";m.textContent="";timerListe[id]=setInterval(()=>{const min=Math.floor(sek/60),s=sek%60;a.textContent=`${min.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;if(sek<=0){clearInterval(timerListe[id]);start.disabled=false;stop.style.display="none";m.textContent="⏰ Timer fertig!";m.classList.add("timer-fertig");timerTonAbspielen();return}sek--},1000)}function timerStoppen(i,si){const id=`${i}-${si}`;if(timerListe[id])clearInterval(timerListe[id]);document.getElementById(`timer-anzeige-${id}`).textContent="Timer gestoppt.";document.getElementById(`timer-start-${id}`).disabled=false;document.getElementById(`timer-stop-${id}`).style.display="none"}function timerTonAbspielen(){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.2;o.start();setTimeout(()=>{o.stop();c.close()},800)}catch{}}
-function rezepteExportieren(){const blob=new Blob([JSON.stringify({app:"rezeptfinder",version: 1.73432,exportDatum:new Date().toISOString(),rezepte},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`rezepte-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();localStorage.setItem("letztesBackupDatum",new Date().toISOString());dashboardAktualisieren()}function rezepteImportieren(){const file=document.getElementById("importDatei").files[0];if(!file){meldungAnzeigen("Bitte Datei auswählen.",true);return}const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.rezepte)throw 0;rezepte=d.rezepte;datenstrukturReparieren();dashboardAktualisieren();meldungAnzeigen("Import abgeschlossen.")}catch{meldungAnzeigen("Ungültige Backup-Datei.",true)}};r.readAsText(file)}function backupHinweisAktualisieren(){const e=document.getElementById("backupHinweis"),d=localStorage.getItem("letztesBackupDatum");if(!d){e.textContent="Noch kein Backup erstellt.";return}const tage=Math.floor((new Date()-new Date(d))/(864e5));e.textContent=tage>=7?`Letztes Backup vor ${tage} Tagen. Bitte wieder exportieren.`:`Letztes Backup vor ${tage} Tagen.`}function alleDatenLoeschen(){if(!confirm("Wirklich alle Daten löschen?"))return;rezepte=[];speichern();datenSpeichern("einkaufsliste",[]);dashboardAktualisieren();
+function rezepteExportieren(){const blob=new Blob([JSON.stringify({app:"rezeptfinder",version: 1.74432,exportDatum:new Date().toISOString(),rezepte},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`rezepte-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();localStorage.setItem("letztesBackupDatum",new Date().toISOString());dashboardAktualisieren()}function rezepteImportieren(){const file=document.getElementById("importDatei").files[0];if(!file){meldungAnzeigen("Bitte Datei auswählen.",true);return}const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.rezepte)throw 0;rezepte=d.rezepte;datenstrukturReparieren();dashboardAktualisieren();meldungAnzeigen("Import abgeschlossen.")}catch{meldungAnzeigen("Ungültige Backup-Datei.",true)}};r.readAsText(file)}function backupHinweisAktualisieren(){const e=document.getElementById("backupHinweis"),d=localStorage.getItem("letztesBackupDatum");if(!d){e.textContent="Noch kein Backup erstellt.";return}const tage=Math.floor((new Date()-new Date(d))/(864e5));e.textContent=tage>=7?`Letztes Backup vor ${tage} Tagen. Bitte wieder exportieren.`:`Letztes Backup vor ${tage} Tagen.`}function alleDatenLoeschen(){if(!confirm("Wirklich alle Daten löschen?"))return;rezepte=[];speichern();datenSpeichern("einkaufsliste",[]);dashboardAktualisieren();
 rezeptDesTagesAufStartseite();document.getElementById("ergebnisse").innerHTML=""}
 function rezeptDrucken(i){const r=rezepte[i],f=window.open("","_blank");f.document.write(`<!doctype html><html><head><meta charset="UTF-8"><title>${r.name}</title><style>body{font-family:Arial;padding:40px;line-height:1.6}.rezeptkarte{max-width:800px;margin:auto}.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.info-box{border:1px solid #ddd;padding:10px;border-radius:8px;background:#f8f8f8}h2{border-bottom:2px solid #ddd;padding-bottom:5px}li{margin-bottom:8px}</style></head><body><div class="rezeptkarte"><h1>${r.name}</h1><p>${r.kategorie}</p><div class="info-grid"><div class="info-box"><b>Portionen:</b><br>${r.portionen||"nicht angegeben"}</div><div class="info-box"><b>Schwierigkeit:</b><br>${r.schwierigkeit||"nicht angegeben"}</div><div class="info-box"><b>Zeit:</b><br>${r.zubereitungszeit||"nicht angegeben"}</div><div class="info-box"><b>Quelle:</b><br>${r.quelle||"nicht angegeben"}</div></div><h2>Utensilien</h2><p>${(r.utensilien||[]).join(", ")||"keine"}</p><h2>Zutaten</h2>${zutatenGruppenHtml(r)}<h2>Zubereitung</h2><ol>${zubereitungsSchritte(r.zubereitung).map(s=>`<li>${s}</li>`).join("")}</ol>${r.notizen?`<h2>Notizen</h2><p>${r.notizen}</p>`:""}</div><script>window.print()<\/script></body></html>`);f.document.close()}
 function rezeptTextAnalysieren(){const d=rezeptTextParsen(v("textImportInput"));bereichAnzeigen("formularBereich");document.getElementById("nameInput").value=d.name;document.getElementById("kategorieInput").value=d.kategorie;document.getElementById("portionenInput").value=d.portionen;document.getElementById("schwierigkeitInput").value=d.schwierigkeit;document.getElementById("zubereitungszeitInput").value=d.zubereitungszeit;document.getElementById("quelleInput").value=d.quelle;document.getElementById("utensilienInput").value=d.utensilien.join(", ");document.getElementById("zubereitungInput").value=d.zubereitung.join(". ");document.getElementById("notizenInput").value=d.notizen;document.getElementById("tagsInput").value=d.tags.join(", ");zutatenGruppenInsFormularLaden(d.zutatenGruppen)}function rezeptTextParsen(text){const zeilen=text.split("\n").map(x=>x.trim()).filter(Boolean),d={name:"",kategorie:"Nicht zugeordnet",portionen:"",schwierigkeit:"",zubereitungszeit:"",quelle:"",utensilien:[],tags:[],zutatenGruppen:[],zubereitung:[],notizen:""};let bereich="",gruppe=null;zeilen.forEach(z=>{const k=z.toLowerCase();if(k.startsWith("name:")){d.name=wert(z);return}if(k.startsWith("kategorie:")){d.kategorie=wert(z);return}if(k.startsWith("portionen:")){d.portionen=wert(z);return}if(k.startsWith("schwierigkeit:")){d.schwierigkeit=wert(z);return}if(k.startsWith("zubereitungszeit:")){d.zubereitungszeit=wert(z);return}if(k.startsWith("quelle:")){d.quelle=wert(z);return}if(k.startsWith("utensilien:")){d.utensilien=wert(z).split(",").map(x=>textTitel(x.trim())).filter(Boolean);return}if(k.startsWith("tags:")){d.tags=wert(z).split(",").map(x=>x.trim()).filter(Boolean);return}if(k==="zutaten:"){bereich="zutaten";return}if(k==="zubereitung:"){bereich="zubereitung";return}if(k==="notizen:"){bereich="notizen";return}if(bereich==="zutaten"){if(z.endsWith(":")){gruppe={name:z.slice(0,-1),zutaten:[]};d.zutatenGruppen.push(gruppe);return}if(!gruppe){gruppe={name:"Zutaten",zutaten:[]};d.zutatenGruppen.push(gruppe)}gruppe.zutaten.push(zutatNormalisieren(z))}if(bereich==="zubereitung")d.zubereitung.push(z.replace(/\.$/,""));if(bereich==="notizen")d.notizen+=(d.notizen?"\n":"")+z});if(!d.name&&zeilen[0])d.name=zeilen[0];if(!d.zutatenGruppen.length)d.zutatenGruppen=[{name:"Zutaten",zutaten:[]}];return d}function wert(z){return z.split(":").slice(1).join(":").trim()}
@@ -19841,5 +19841,500 @@ if (rf164OriginalCloudHerunterladen) {
     rf173BindButtons();
     setTimeout(rf173BindButtons, 500);
     setTimeout(rf173BindButtons, 1500);
+  });
+})();
+
+
+
+// =====================================================
+// VERSION 1.74: Cloud-Sync FINAL als echte Ersetzung
+// Fehlerursache: upsert löscht alte Cloud-Rezepte nicht.
+// Neue Lösung:
+// - "Jetzt in Cloud speichern" ersetzt die Cloud vollständig durch lokale Rezepte
+// - alte Cloud-Rezepte werden physisch gelöscht UND zusätzlich als gelöscht überschrieben
+// - "Aus Cloud laden" ersetzt die lokale Liste komplett
+// - neue Rezepte werden wirklich neu angelegt, nicht überschrieben
+// =====================================================
+
+(function () {
+  const RF174_SYSTEM_DELETE_ROW = "__rezeptfinder_deleted_keys__";
+  let rf174Busy = false;
+  let rf174EditMode = false;
+
+  function rf174Status(text, error) {
+    try {
+      if (typeof cloudStatus === "function") cloudStatus(text, !!error);
+      else console.log(text);
+    } catch (e) {
+      console.log(text);
+    }
+  }
+
+  function rf174Id() {
+    try {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch (e) {}
+    return "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function rf174Text(id) {
+    const el = document.getElementById(id);
+    return el ? String(el.value || "").trim() : "";
+  }
+
+  function rf174NumberOrText(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const n = Number(raw.replace(",", "."));
+    return Number.isFinite(n) ? n : raw;
+  }
+
+  function rf174Tags(raw) {
+    return String(raw || "")
+      .split(/[,;#]/)
+      .map(x => x.trim().toLowerCase())
+      .filter(Boolean)
+      .filter((x, i, arr) => arr.indexOf(x) === i);
+  }
+
+  function rf174Utensilien(raw) {
+    return String(raw || "")
+      .split(/[,;\n]/)
+      .map(x => x.trim())
+      .filter(Boolean);
+  }
+
+  function rf174DeletedKeys() {
+    try {
+      return JSON.parse(localStorage.getItem("geloeschteRezeptKeys") || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function rf174RecipeKeys(r) {
+    if (!r) return [];
+    const keys = [];
+    if (r.id) {
+      keys.push(String(r.id));
+      keys.push("id:" + String(r.id));
+    }
+    if (r.cloud_id) {
+      keys.push(String(r.cloud_id));
+      keys.push("id:" + String(r.cloud_id));
+    }
+    if (r.uuid) {
+      keys.push(String(r.uuid));
+      keys.push("id:" + String(r.uuid));
+    }
+    if (r.name) {
+      keys.push("name:" + String(r.name || "").trim().toLowerCase() + "|quelle:" + String(r.quelle || "").trim().toLowerCase());
+    }
+    return [...new Set(keys.filter(Boolean))];
+  }
+
+  function rf174IsDeletedOrSystem(r) {
+    if (!r) return true;
+    if (r.id === RF174_SYSTEM_DELETE_ROW || r.__system === "deleted_keys" || r.system_typ === "deleted_keys") return true;
+    if (r.geloescht || r.deleted || r.__deleted) return true;
+
+    const keys = new Set(rf174DeletedKeys().map(String));
+    return rf174RecipeKeys(r).some(k => keys.has(String(k)));
+  }
+
+  function rf174EnsureIds(list) {
+    return (Array.isArray(list) ? list : []).map(r => {
+      if (!r.id) r.id = rf174Id();
+      return r;
+    });
+  }
+
+  function rf174ReadLocal() {
+    let fromStorage = [];
+    try {
+      fromStorage = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch (e) {
+      fromStorage = [];
+    }
+
+    let base = Array.isArray(rezepte) && rezepte.length >= fromStorage.length ? rezepte : fromStorage;
+    return rf174EnsureIds(base).filter(r => !rf174IsDeletedOrSystem(r));
+  }
+
+  function rf174WriteLocal(list) {
+    rezepte = rf174EnsureIds(list).filter(r => !rf174IsDeletedOrSystem(r));
+    localStorage.setItem("rezepte", JSON.stringify(rezepte));
+    return rezepte;
+  }
+
+  function rf174ReadIngredients() {
+    const container = document.getElementById("zutatenGruppen");
+    if (!container) return [];
+
+    const groups = [];
+    Array.from(container.querySelectorAll(".zutatengruppe")).forEach((gruppe, gi) => {
+      const nameEl = gruppe.querySelector(".zutaten-gruppenname");
+      const groupName = nameEl && nameEl.value.trim() ? nameEl.value.trim() : (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1));
+
+      const zutaten = [];
+      Array.from(gruppe.querySelectorAll(".zutaten-zeile")).forEach(row => {
+        const menge = row.querySelector(".zutat-menge") ? String(row.querySelector(".zutat-menge").value || "").trim() : "";
+        const einheit = row.querySelector(".zutat-einheit") ? String(row.querySelector(".zutat-einheit").value || "").trim() : "";
+        const name = row.querySelector(".zutat-name") ? String(row.querySelector(".zutat-name").value || "").trim() : "";
+
+        if (menge || einheit || name) zutaten.push({ menge, einheit, name });
+      });
+
+      if (zutaten.length) groups.push({ name: groupName, zutaten });
+    });
+
+    return groups;
+  }
+
+  function rf174RecipeFromForm() {
+    const groups = rf174ReadIngredients();
+    const flat = groups.flatMap(g => g.zutaten || []);
+
+    const editing = rf174EditMode && typeof bearbeitungsIndex !== "undefined" && bearbeitungsIndex !== null && Array.isArray(rezepte) && rezepte[bearbeitungsIndex];
+    const old = editing ? rezepte[bearbeitungsIndex] : null;
+
+    return {
+      id: old && old.id ? old.id : rf174Id(),
+      name: rf174Text("nameInput"),
+      kategorie: rf174Text("kategorieInput") || "Nicht zugeordnet",
+      portionen: rf174NumberOrText(rf174Text("portionenInput")),
+      schwierigkeit: rf174Text("schwierigkeitInput"),
+      zubereitungszeit: rf174Text("zubereitungszeitInput"),
+      quelle: rf174Text("quelleInput") || "Nicht zugeordnet",
+      tags: rf174Tags(rf174Text("tagsInput")),
+      zubereitung: rf174Text("zubereitungInput"),
+      utensilien: rf174Utensilien(rf174Text("utensilienInput")),
+      notizen: rf174Text("notizenInput"),
+      naehrwerte: {
+        kalorien: rf174NumberOrText(rf174Text("kalorienInput")),
+        eiweiss: rf174NumberOrText(rf174Text("eiweissInput")),
+        kohlenhydrate: rf174NumberOrText(rf174Text("kohlenhydrateInput")),
+        fett: rf174NumberOrText(rf174Text("fettInput")),
+        zucker: rf174NumberOrText(rf174Text("zuckerInput")),
+        ballaststoffe: rf174NumberOrText(rf174Text("ballaststoffeInput")),
+        salz: rf174NumberOrText(rf174Text("salzInput"))
+      },
+      zutatenGruppen: groups,
+      zutaten: flat,
+      ausprobiert: document.getElementById("ausprobiertInput") ? document.getElementById("ausprobiertInput").value === "true" : false,
+      favorit: old ? !!old.favorit : false,
+      bewertung: old ? Number(old.bewertung || 0) : 0,
+      erstelltAm: old && old.erstelltAm ? old.erstelltAm : new Date().toISOString(),
+      aktualisiertAm: new Date().toISOString()
+    };
+  }
+
+  function rf174Validate(r) {
+    if (!r.name) return "Bitte einen Rezeptnamen eingeben.";
+    if (!r.zutaten || !r.zutaten.length) return "Bitte mindestens eine Zutat eingeben.";
+    if (!r.zubereitung) return "Bitte eine Zubereitung eingeben.";
+    return "";
+  }
+
+  function rf174Refresh() {
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch (e) {}
+    try { if (typeof suchTagsDropdownAktualisieren === "function") suchTagsDropdownAktualisieren(); } catch (e) {}
+    try { if (typeof quellenDropdownAktualisieren === "function") quellenDropdownAktualisieren(); } catch (e) {}
+    try { if (typeof rezeptSucheAusfuehren === "function") { rezeptSucheAusfuehren(); return; } } catch (e) {}
+    try { if (typeof zeigeErgebnisse === "function") zeigeErgebnisse(rezepte.map((r, index) => ({ ...r, index }))); } catch (e) {}
+  }
+
+  function rf174SaveRecipe() {
+    try {
+      rezepte = rf174ReadLocal();
+
+      const r = rf174RecipeFromForm();
+      const err = rf174Validate(r);
+      if (err) {
+        alert(err);
+        return false;
+      }
+
+      const editing = rf174EditMode && typeof bearbeitungsIndex !== "undefined" && bearbeitungsIndex !== null && rezepte[bearbeitungsIndex];
+
+      if (editing) {
+        rezepte[bearbeitungsIndex] = r;
+      } else {
+        rezepte.push(r);
+      }
+
+      rf174EditMode = false;
+      bearbeitungsIndex = null;
+      if (document.body && document.body.classList) document.body.classList.remove("bearbeitet-modus");
+
+      rf174WriteLocal(rezepte);
+      rf174Refresh();
+
+      if (typeof meldungAnzeigen === "function") meldungAnzeigen(`Rezept gespeichert. Gesamt: ${rezepte.length}`);
+      else alert(`Rezept gespeichert. Gesamt: ${rezepte.length}`);
+
+      try {
+        const form = document.getElementById("formularBereich");
+        if (form && form.classList) form.classList.add("versteckt");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (e) {}
+
+      return true;
+    } catch (e) {
+      console.error("RF174 Speichern Fehler:", e);
+      alert("Rezept konnte nicht gespeichert werden: " + (e.message || "unbekannter Fehler"));
+      return false;
+    }
+  }
+
+  async function rf174Client() {
+    try { if (typeof cloudInit === "function") cloudInit(); } catch (e) {}
+    const client = typeof supabaseClient !== "undefined" ? supabaseClient : null;
+    if (!client) throw new Error("Supabase ist nicht verbunden.");
+    return client;
+  }
+
+  async function rf174ReadAllCloudRows(client) {
+    const { data, error } = await client
+      .from("rezepte")
+      .select("id, name, daten, aktualisiert_am");
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function rf174CleanCloudBeforeUpload(client, currentIds) {
+    const existing = await rf174ReadAllCloudRows(client);
+    const ids = existing
+      .map(r => r.id)
+      .filter(id => id && id !== RF174_SYSTEM_DELETE_ROW);
+
+    let physicalDeleted = 0;
+    let softDeleted = 0;
+
+    // Erst alle vorhandenen Cloud-Rezepte als gelöscht markieren.
+    // Danach werden die aktuellen Rezepte wieder aktiv überschrieben.
+    const softRows = ids.map(id => ({
+      id: String(id),
+      name: "Gelöschtes Rezept",
+      daten: {
+        id: String(id),
+        geloescht: true,
+        deleted: true,
+        __deleted: true,
+        geloescht_am: new Date().toISOString()
+      },
+      aktualisiert_am: new Date().toISOString()
+    }));
+
+    if (softRows.length) {
+      const { error } = await client.from("rezepte").upsert(softRows, { onConflict: "id" });
+      if (!error) softDeleted = softRows.length;
+      else console.warn("Softdelete alter Cloud-Zeilen fehlgeschlagen:", error);
+    }
+
+    // Zusätzlich physisch löschen versuchen.
+    for (const id of ids) {
+      try {
+        const res = await client.from("rezepte").delete().eq("id", id);
+        if (!res || !res.error) physicalDeleted++;
+        else console.warn("Cloud-Zeile konnte nicht physisch gelöscht werden:", id, res.error);
+      } catch (e) {
+        console.warn("Cloud-Zeile physisch löschen Fehler:", id, e);
+      }
+    }
+
+    return { existing: ids.length, physicalDeleted, softDeleted };
+  }
+
+  async function rf174SaveCloudReplace() {
+    if (rf174Busy) return false;
+    rf174Busy = true;
+
+    try {
+      const client = await rf174Client();
+      const current = rf174WriteLocal(rf174ReadLocal());
+
+      rf174Status("ersetze Cloud ...");
+
+      const currentIds = new Set(current.map(r => String(r.id)));
+      const cleanup = await rf174CleanCloudBeforeUpload(client, currentIds);
+
+      const rows = current.map(r => ({
+        id: String(r.id),
+        name: r.name || "Unbenanntes Rezept",
+        daten: JSON.parse(JSON.stringify(r)),
+        aktualisiert_am: new Date().toISOString()
+      }));
+
+      if (rows.length) {
+        const { error } = await client
+          .from("rezepte")
+          .upsert(rows, { onConflict: "id" });
+
+        if (error) throw error;
+      }
+
+      rf174Status(`${rows.length} Rezept(e) in Cloud gespeichert`);
+      alert(`${rows.length} Rezept(e) in Cloud gespeichert. Alte Cloud-Einträge bereinigt: ${cleanup.existing}`);
+      return true;
+    } catch (e) {
+      console.error("RF174 Cloud ersetzen Fehler:", e);
+      rf174Status("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      rf174Busy = false;
+    }
+  }
+
+  async function rf174LoadCloudOverwrite() {
+    if (rf174Busy) return false;
+    rf174Busy = true;
+
+    try {
+      const client = await rf174Client();
+
+      rf174Status("lade aus Cloud ...");
+
+      const { data, error } = await client
+        .from("rezepte")
+        .select("id, name, daten, aktualisiert_am")
+        .order("aktualisiert_am", { ascending: false });
+
+      if (error) throw error;
+
+      const loaded = (data || [])
+        .map(row => {
+          const r = row.daten || {};
+          if (!r.id) r.id = row.id;
+          return r;
+        })
+        .filter(r => !rf174IsDeletedOrSystem(r));
+
+      rf174WriteLocal(loaded);
+      rf174Refresh();
+
+      rf174Status(`${rezepte.length} Rezept(e) aus Cloud geladen`);
+      alert(`${rezepte.length} Rezept(e) aus Cloud geladen.`);
+      return true;
+    } catch (e) {
+      console.error("RF174 Cloud laden Fehler:", e);
+      rf174Status("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      rf174Busy = false;
+    }
+  }
+
+  const oldEdit174 = typeof rezeptBearbeiten === "function" ? rezeptBearbeiten : null;
+  if (oldEdit174) {
+    rezeptBearbeiten = function(index) {
+      rf174EditMode = true;
+      if (document.body && document.body.classList) document.body.classList.add("bearbeitet-modus");
+      return oldEdit174(index);
+    };
+    window.rezeptBearbeiten = rezeptBearbeiten;
+  }
+
+  function rf174NewMode() {
+    rf174EditMode = false;
+    bearbeitungsIndex = null;
+    if (document.body && document.body.classList) document.body.classList.remove("bearbeitet-modus");
+  }
+
+  const oldFormClear174 = typeof formularLeeren === "function" ? formularLeeren : null;
+  if (oldFormClear174) {
+    formularLeeren = function() {
+      rf174NewMode();
+      return oldFormClear174();
+    };
+    window.formularLeeren = formularLeeren;
+  }
+
+  const oldAddToggle174 = typeof rezeptHinzufuegenToggle === "function" ? rezeptHinzufuegenToggle : null;
+  if (oldAddToggle174) {
+    rezeptHinzufuegenToggle = function() {
+      rf174NewMode();
+      return oldAddToggle174();
+    };
+    window.rezeptHinzufuegenToggle = rezeptHinzufuegenToggle;
+  }
+
+  function rf155RezeptSpeichern() { return rf174SaveRecipe(); }
+  function rezeptSpeichernDirektCloud() { return rf174SaveRecipe(); }
+  function rezeptSpeichern() { return rf174SaveRecipe(); }
+
+  function cloudSpeichernAlle() { return rf174SaveCloudReplace(); }
+  function cloudSpeichernAlleDirekt() { return rf174SaveCloudReplace(); }
+  function cloudSpeichernAlleDirekt1294() { return rf174SaveCloudReplace(); }
+
+  function cloudLaden() { return rf174LoadCloudOverwrite(); }
+  function cloudHerunterladen() { return rf174LoadCloudOverwrite(); }
+  function ausCloudLaden() { return rf174LoadCloudOverwrite(); }
+
+  window.rf174SaveRecipe = rf174SaveRecipe;
+  window.rf155RezeptSpeichern = rf174SaveRecipe;
+  window.rezeptSpeichernDirektCloud = rf174SaveRecipe;
+  window.rezeptSpeichern = rf174SaveRecipe;
+
+  window.rf174SaveCloudReplace = rf174SaveCloudReplace;
+  window.cloudSpeichernAlle = rf174SaveCloudReplace;
+  window.cloudSpeichernAlleDirekt = rf174SaveCloudReplace;
+  window.cloudSpeichernAlleDirekt1294 = rf174SaveCloudReplace;
+
+  window.rf174LoadCloudOverwrite = rf174LoadCloudOverwrite;
+  window.cloudLaden = rf174LoadCloudOverwrite;
+  window.cloudHerunterladen = rf174LoadCloudOverwrite;
+  window.ausCloudLaden = rf174LoadCloudOverwrite;
+
+  function rf174BindButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (text === "rezept speichern" || text === "speichern") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf174SaveRecipe();
+          return false;
+        };
+      }
+
+      if (text.includes("cloud") && text.includes("speichern")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf174SaveCloudReplace();
+          return false;
+        };
+      }
+
+      if (text.includes("cloud") && (text.includes("laden") || text.includes("herunter"))) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf174LoadCloudOverwrite();
+          return false;
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    rf174WriteLocal(rf174ReadLocal());
+    rf174BindButtons();
+    setTimeout(rf174BindButtons, 500);
+    setTimeout(rf174BindButtons, 1500);
   });
 })();
