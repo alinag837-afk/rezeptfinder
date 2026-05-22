@@ -166,7 +166,7 @@ function einkaufslisteDrucken(){const list=einkaufZusammenfassen(datenLaden("ein
 function portionenBerechnen(i){const r=rezepte[i],ziel=Number(v(`zielPortionen-${i}`)),out=document.getElementById(`portionenErgebnis-${i}`);out.innerHTML="";if(!ziel||!r.portionen){meldungAnzeigen("Bitte Portionen prüfen.",true);return}const f=ziel/r.portionen;(r.zutatenGruppen||[]).forEach(g=>{const div=document.createElement("div");div.className="zutaten-gruppe-anzeige";div.innerHTML=`<h4>${esc(g.name)}</h4><ul>${(g.zutaten||[]).map(z=>`<li>${zutatUmrechnen(z,f)}</li>`).join("")}</ul>`;out.appendChild(div)})}function zutatUmrechnen(z,f){const d=zutatAnalysieren(z);if(!d.menge||!d.einheit)return`⚠️ ${esc(zutatAlsText(z))} konnte nicht berechnet werden`;return`${mengeMitSchoenerEinheit(d.menge*f,d.basisEinheit)} ${d.name}`}
 function kochmodusStarten(i){const r=rezepte[i],box=document.getElementById(`kochmodus-${i}`),sch=zubereitungsSchritte(r.zubereitung);box.innerHTML=`<h3>Kochmodus</h3><button onclick="kochmodusZuruecksetzen(${i})">Kochmodus zurücksetzen</button><h4>Besondere Utensilien / Utensilien</h4><p>${(r.utensilien||[]).join(", ")||"keine"}</p><h4>Zutaten</h4>${zutatenGruppenHtml(r)}<h4>Schritte</h4><div id="kochschritte-${i}"></div>`;const ziel=box.querySelector(`#kochschritte-${i}`),fort=datenLaden(`kochfortschritt-${r.id}`,[]);sch.forEach((s,si)=>{const zut=zutatenFuerSchrittFinden(zutatenAusRezept(r),s),ut=utensilienFuerSchrittFinden(r.utensilien||[],s),div=document.createElement("div");div.className="kochschritt";div.innerHTML=`<label><input type="checkbox" onchange="kochschrittAbhaken(this,${i},${si})"><span><strong>Schritt ${si+1}:</strong> ${esc(s)}</span></label>${timerHtmlErstellen(s,i,si)}${zut.length?`<p><strong>Benötigte Zutaten:</strong> ${zut.map(z=>z.text).join(", ")}</p>`:""}${ut.length?`<p><strong>Benötigte Utensilien:</strong> ${ut.join(", ")}</p>`:""}`;ziel.appendChild(div);if(fort.includes(si)){div.querySelector("input").checked=true;div.querySelector("span").classList.add("abgehakt")}})}function kochschrittAbhaken(cb,i,si){const r=rezepte[i],key=`kochfortschritt-${r.id}`;let f=datenLaden(key,[]);cb.nextElementSibling.classList.toggle("abgehakt",cb.checked);if(cb.checked&&!f.includes(si))f.push(si);if(!cb.checked)f=f.filter(x=>x!==si);datenSpeichern(key,f)}function kochmodusZuruecksetzen(i){localStorage.removeItem(`kochfortschritt-${rezepte[i].id}`);kochmodusStarten(i)}function zutatenFuerSchrittFinden(zutaten,schritt){const sn=norm(schritt);return zutaten.map((z,i)=>{const d=zutatAnalysieren(z),n=norm(d.name);return{index:i,text:zutatAlsText(z),such:[n,...zutatenSuchwoerter(n)]}}).filter(z=>z.such.some(w=>sn.includes(norm(w))))}function utensilienFuerSchrittFinden(ut,schritt){const sn=norm(schritt);return ut.filter(u=>sn.includes(norm(u)))}function zutatenSuchwoerter(n){const g=[["parmesan","kaese","käse"],["mozzarella","kaese","käse"],["spaghetti","nudeln","pasta"],["eier","ei"],["tomaten","tomate"],["kartoffeln","kartoffel"],["zwiebeln","zwiebel"]];let s=[n];g.forEach(a=>{if(a.map(norm).includes(norm(n)))s.push(...a)});return[...new Set(s)]}
 function timerHtmlErstellen(s,i,si){const z=zeitAusTextFinden(s);if(!z)return"";return`<div class="timer-box"><input id="timer-wert-${i}-${si}" value="${z.original}"><button id="timer-start-${i}-${si}" onclick="timerManuellStarten(${i},${si})">Timer starten</button><button id="timer-stop-${i}-${si}" onclick="timerStoppen(${i},${si})" style="display:none">Stoppen</button><span id="timer-anzeige-${i}-${si}"></span><div id="timer-meldung-${i}-${si}" class="timer-meldung"></div></div>`}function timerManuellStarten(i,si){const sek=zeitZuSekunden(v(`timer-wert-${i}-${si}`).toLowerCase());if(!sek){meldungAnzeigen("Bitte gültige Zeit eingeben.",true);return}timerStartenMitZeit(i,si,sek)}function timerStartenMitZeit(i,si,sek){const id=`${i}-${si}`,a=document.getElementById(`timer-anzeige-${id}`),start=document.getElementById(`timer-start-${id}`),stop=document.getElementById(`timer-stop-${id}`),m=document.getElementById(`timer-meldung-${id}`);if(timerListe[id])clearInterval(timerListe[id]);start.disabled=true;stop.style.display="inline-block";m.textContent="";timerListe[id]=setInterval(()=>{const min=Math.floor(sek/60),s=sek%60;a.textContent=`${min.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`;if(sek<=0){clearInterval(timerListe[id]);start.disabled=false;stop.style.display="none";m.textContent="⏰ Timer fertig!";m.classList.add("timer-fertig");timerTonAbspielen();return}sek--},1000)}function timerStoppen(i,si){const id=`${i}-${si}`;if(timerListe[id])clearInterval(timerListe[id]);document.getElementById(`timer-anzeige-${id}`).textContent="Timer gestoppt.";document.getElementById(`timer-start-${id}`).disabled=false;document.getElementById(`timer-stop-${id}`).style.display="none"}function timerTonAbspielen(){try{const c=new(window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.2;o.start();setTimeout(()=>{o.stop();c.close()},800)}catch{}}
-function rezepteExportieren(){const blob=new Blob([JSON.stringify({app:"rezeptfinder",version: 1.69432,exportDatum:new Date().toISOString(),rezepte},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`rezepte-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();localStorage.setItem("letztesBackupDatum",new Date().toISOString());dashboardAktualisieren()}function rezepteImportieren(){const file=document.getElementById("importDatei").files[0];if(!file){meldungAnzeigen("Bitte Datei auswählen.",true);return}const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.rezepte)throw 0;rezepte=d.rezepte;datenstrukturReparieren();dashboardAktualisieren();meldungAnzeigen("Import abgeschlossen.")}catch{meldungAnzeigen("Ungültige Backup-Datei.",true)}};r.readAsText(file)}function backupHinweisAktualisieren(){const e=document.getElementById("backupHinweis"),d=localStorage.getItem("letztesBackupDatum");if(!d){e.textContent="Noch kein Backup erstellt.";return}const tage=Math.floor((new Date()-new Date(d))/(864e5));e.textContent=tage>=7?`Letztes Backup vor ${tage} Tagen. Bitte wieder exportieren.`:`Letztes Backup vor ${tage} Tagen.`}function alleDatenLoeschen(){if(!confirm("Wirklich alle Daten löschen?"))return;rezepte=[];speichern();datenSpeichern("einkaufsliste",[]);dashboardAktualisieren();
+function rezepteExportieren(){const blob=new Blob([JSON.stringify({app:"rezeptfinder",version: 1.72432,exportDatum:new Date().toISOString(),rezepte},null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`rezepte-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();localStorage.setItem("letztesBackupDatum",new Date().toISOString());dashboardAktualisieren()}function rezepteImportieren(){const file=document.getElementById("importDatei").files[0];if(!file){meldungAnzeigen("Bitte Datei auswählen.",true);return}const r=new FileReader();r.onload=e=>{try{const d=JSON.parse(e.target.result);if(!d.rezepte)throw 0;rezepte=d.rezepte;datenstrukturReparieren();dashboardAktualisieren();meldungAnzeigen("Import abgeschlossen.")}catch{meldungAnzeigen("Ungültige Backup-Datei.",true)}};r.readAsText(file)}function backupHinweisAktualisieren(){const e=document.getElementById("backupHinweis"),d=localStorage.getItem("letztesBackupDatum");if(!d){e.textContent="Noch kein Backup erstellt.";return}const tage=Math.floor((new Date()-new Date(d))/(864e5));e.textContent=tage>=7?`Letztes Backup vor ${tage} Tagen. Bitte wieder exportieren.`:`Letztes Backup vor ${tage} Tagen.`}function alleDatenLoeschen(){if(!confirm("Wirklich alle Daten löschen?"))return;rezepte=[];speichern();datenSpeichern("einkaufsliste",[]);dashboardAktualisieren();
 rezeptDesTagesAufStartseite();document.getElementById("ergebnisse").innerHTML=""}
 function rezeptDrucken(i){const r=rezepte[i],f=window.open("","_blank");f.document.write(`<!doctype html><html><head><meta charset="UTF-8"><title>${r.name}</title><style>body{font-family:Arial;padding:40px;line-height:1.6}.rezeptkarte{max-width:800px;margin:auto}.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.info-box{border:1px solid #ddd;padding:10px;border-radius:8px;background:#f8f8f8}h2{border-bottom:2px solid #ddd;padding-bottom:5px}li{margin-bottom:8px}</style></head><body><div class="rezeptkarte"><h1>${r.name}</h1><p>${r.kategorie}</p><div class="info-grid"><div class="info-box"><b>Portionen:</b><br>${r.portionen||"nicht angegeben"}</div><div class="info-box"><b>Schwierigkeit:</b><br>${r.schwierigkeit||"nicht angegeben"}</div><div class="info-box"><b>Zeit:</b><br>${r.zubereitungszeit||"nicht angegeben"}</div><div class="info-box"><b>Quelle:</b><br>${r.quelle||"nicht angegeben"}</div></div><h2>Utensilien</h2><p>${(r.utensilien||[]).join(", ")||"keine"}</p><h2>Zutaten</h2>${zutatenGruppenHtml(r)}<h2>Zubereitung</h2><ol>${zubereitungsSchritte(r.zubereitung).map(s=>`<li>${s}</li>`).join("")}</ol>${r.notizen?`<h2>Notizen</h2><p>${r.notizen}</p>`:""}</div><script>window.print()<\/script></body></html>`);f.document.close()}
 function rezeptTextAnalysieren(){const d=rezeptTextParsen(v("textImportInput"));bereichAnzeigen("formularBereich");document.getElementById("nameInput").value=d.name;document.getElementById("kategorieInput").value=d.kategorie;document.getElementById("portionenInput").value=d.portionen;document.getElementById("schwierigkeitInput").value=d.schwierigkeit;document.getElementById("zubereitungszeitInput").value=d.zubereitungszeit;document.getElementById("quelleInput").value=d.quelle;document.getElementById("utensilienInput").value=d.utensilien.join(", ");document.getElementById("zubereitungInput").value=d.zubereitung.join(". ");document.getElementById("notizenInput").value=d.notizen;document.getElementById("tagsInput").value=d.tags.join(", ");zutatenGruppenInsFormularLaden(d.zutatenGruppen)}function rezeptTextParsen(text){const zeilen=text.split("\n").map(x=>x.trim()).filter(Boolean),d={name:"",kategorie:"Nicht zugeordnet",portionen:"",schwierigkeit:"",zubereitungszeit:"",quelle:"",utensilien:[],tags:[],zutatenGruppen:[],zubereitung:[],notizen:""};let bereich="",gruppe=null;zeilen.forEach(z=>{const k=z.toLowerCase();if(k.startsWith("name:")){d.name=wert(z);return}if(k.startsWith("kategorie:")){d.kategorie=wert(z);return}if(k.startsWith("portionen:")){d.portionen=wert(z);return}if(k.startsWith("schwierigkeit:")){d.schwierigkeit=wert(z);return}if(k.startsWith("zubereitungszeit:")){d.zubereitungszeit=wert(z);return}if(k.startsWith("quelle:")){d.quelle=wert(z);return}if(k.startsWith("utensilien:")){d.utensilien=wert(z).split(",").map(x=>textTitel(x.trim())).filter(Boolean);return}if(k.startsWith("tags:")){d.tags=wert(z).split(",").map(x=>x.trim()).filter(Boolean);return}if(k==="zutaten:"){bereich="zutaten";return}if(k==="zubereitung:"){bereich="zubereitung";return}if(k==="notizen:"){bereich="notizen";return}if(bereich==="zutaten"){if(z.endsWith(":")){gruppe={name:z.slice(0,-1),zutaten:[]};d.zutatenGruppen.push(gruppe);return}if(!gruppe){gruppe={name:"Zutaten",zutaten:[]};d.zutatenGruppen.push(gruppe)}gruppe.zutaten.push(zutatNormalisieren(z))}if(bereich==="zubereitung")d.zubereitung.push(z.replace(/\.$/,""));if(bereich==="notizen")d.notizen+=(d.notizen?"\n":"")+z});if(!d.name&&zeilen[0])d.name=zeilen[0];if(!d.zutatenGruppen.length)d.zutatenGruppen=[{name:"Zutaten",zutaten:[]}];return d}function wert(z){return z.split(":").slice(1).join(":").trim()}
@@ -18531,5 +18531,868 @@ if (rf164OriginalCloudHerunterladen) {
       rf169PruneLocal();
       rf169Refresh();
     });
+  });
+})();
+
+
+
+// =====================================================
+// VERSION 1.70: Löschen FINAL über echte Rezept-ID
+// Problem behoben: Such-/Anzeige-Indizes können falsch sein.
+// Jeder Löschbutton löscht jetzt über Rezept-ID, nicht mehr über Listenposition.
+// =====================================================
+
+(function () {
+  const RF170_DELETED_ROW_ID = "__rezeptfinder_deleted_keys__";
+
+  function esc170(v) {
+    if (typeof esc === "function") return esc(v);
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function ensureId170(rezept) {
+    if (!rezept) return "";
+    if (!rezept.id) {
+      try {
+        rezept.id = crypto && crypto.randomUUID ? crypto.randomUUID() : "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+      } catch (e) {
+        rezept.id = "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+      }
+    }
+    return String(rezept.id);
+  }
+
+  function localDeletedKeys170() {
+    try {
+      return JSON.parse(localStorage.getItem("geloeschteRezeptKeys") || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveLocalDeletedKeys170(keys) {
+    localStorage.setItem("geloeschteRezeptKeys", JSON.stringify([...new Set((keys || []).filter(Boolean).map(String))]));
+  }
+
+  function recipeKeys170(rezept) {
+    if (!rezept) return [];
+    const keys = [];
+    if (rezept.id) {
+      keys.push(String(rezept.id));
+      keys.push("id:" + String(rezept.id));
+    }
+    if (rezept.cloud_id) {
+      keys.push(String(rezept.cloud_id));
+      keys.push("id:" + String(rezept.cloud_id));
+    }
+    if (rezept.uuid) {
+      keys.push(String(rezept.uuid));
+      keys.push("id:" + String(rezept.uuid));
+    }
+    if (rezept.name) {
+      keys.push("name:" + String(rezept.name || "").trim().toLowerCase() + "|quelle:" + String(rezept.quelle || "").trim().toLowerCase());
+    }
+    return [...new Set(keys.filter(Boolean))];
+  }
+
+  function isSystem170(r) {
+    return !!(r && (r.id === RF170_DELETED_ROW_ID || r.__system === "deleted_keys" || r.system_typ === "deleted_keys"));
+  }
+
+  function isDeleted170(r) {
+    if (!r) return false;
+    if (isSystem170(r)) return true;
+    if (r.geloescht || r.deleted || r.__deleted) return true;
+    const keys = new Set(localDeletedKeys170().map(String));
+    return recipeKeys170(r).some(k => keys.has(String(k)));
+  }
+
+  async function client170() {
+    try { if (typeof cloudInit === "function") cloudInit(); } catch(e) {}
+    return typeof supabaseClient !== "undefined" ? supabaseClient : null;
+  }
+
+  async function loadDeletedKeys170() {
+    const client = await client170();
+    if (!client) return localDeletedKeys170();
+
+    try {
+      const { data, error } = await client
+        .from("rezepte")
+        .select("id, daten")
+        .eq("id", RF170_DELETED_ROW_ID)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        console.warn("Löschliste laden Fehler:", error);
+      }
+
+      const remote = data && data.daten && Array.isArray(data.daten.keys) ? data.daten.keys : [];
+      const merged = [...localDeletedKeys170(), ...remote];
+      saveLocalDeletedKeys170(merged);
+      return localDeletedKeys170();
+    } catch(e) {
+      console.warn("Löschliste laden fehlgeschlagen:", e);
+      return localDeletedKeys170();
+    }
+  }
+
+  async function saveDeletedKeysCloud170(keys) {
+    saveLocalDeletedKeys170(keys);
+    const client = await client170();
+    if (!client) return false;
+
+    try {
+      const { error } = await client.from("rezepte").upsert([{
+        id: RF170_DELETED_ROW_ID,
+        name: "__Rezeptfinder geloeschte Rezepte__",
+        daten: {
+          id: RF170_DELETED_ROW_ID,
+          __system: "deleted_keys",
+          system_typ: "deleted_keys",
+          keys: localDeletedKeys170(),
+          aktualisiert_am: new Date().toISOString()
+        },
+        aktualisiert_am: new Date().toISOString()
+      }], { onConflict: "id" });
+
+      if (error) throw error;
+      return true;
+    } catch(e) {
+      console.warn("Löschliste Cloud speichern fehlgeschlagen:", e);
+      return false;
+    }
+  }
+
+  function prune170() {
+    if (!Array.isArray(rezepte)) rezepte = [];
+    rezepte.forEach(r => ensureId170(r));
+    rezepte = rezepte.filter(r => !isDeleted170(r));
+    localStorage.setItem("rezepte", JSON.stringify(rezepte));
+  }
+
+  function findById170(id) {
+    const raw = String(id || "");
+    return rezepte.findIndex(r =>
+      String(r.id || "") === raw ||
+      String(r.cloud_id || "") === raw ||
+      String(r.uuid || "") === raw
+    );
+  }
+
+  function findByIndexOrId170(value) {
+    prune170();
+
+    const raw = String(value || "");
+    const byId = findById170(raw);
+    if (byId >= 0) return byId;
+
+    if (/^\d+$/.test(raw)) {
+      const i = Number(raw);
+      if (i >= 0 && i < rezepte.length) return i;
+    }
+
+    return -1;
+  }
+
+  async function deleteCloud170(rezept) {
+    const client = await client170();
+    if (!client || !rezept) return false;
+
+    const id = ensureId170(rezept);
+    let ok = false;
+
+    // 1. Physisch per id löschen
+    try {
+      const { error } = await client.from("rezepte").delete().eq("id", id);
+      if (!error) ok = true;
+      else console.warn("Delete id Fehler:", error);
+    } catch(e) {
+      console.warn("Delete id Exception:", e);
+    }
+
+    // 2. Zusätzlich per name löschen, falls Alt-Datensatz ohne passende ID existiert
+    if (rezept.name) {
+      try {
+        const { error } = await client.from("rezepte").delete().eq("name", rezept.name);
+        if (!error) ok = true;
+      } catch(e) {}
+    }
+
+    // 3. Softdelete-Datensatz setzen, damit andere Geräte ihn ignorieren
+    try {
+      const deletedData = {
+        ...JSON.parse(JSON.stringify(rezept)),
+        id,
+        geloescht: true,
+        deleted: true,
+        __deleted: true,
+        geloescht_am: new Date().toISOString()
+      };
+      await client.from("rezepte").upsert([{
+        id,
+        name: rezept.name || "Gelöschtes Rezept",
+        daten: deletedData,
+        aktualisiert_am: new Date().toISOString()
+      }], { onConflict: "id" });
+    } catch(e) {
+      console.warn("Softdelete Fehler:", e);
+    }
+
+    return ok;
+  }
+
+  function refresh170() {
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+    try { if (typeof rezeptSucheAusfuehren === "function") { rezeptSucheAusfuehren(); return; } } catch(e) {}
+    try { if (typeof zeigeErgebnisse === "function") zeigeErgebnisse(rezepte.map((r, index) => ({...r, index}))); } catch(e) {}
+  }
+
+  async function deleteRecipeById170(id) {
+    await loadDeletedKeys170();
+    prune170();
+
+    const i = findByIndexOrId170(id);
+    if (i < 0 || !rezepte[i]) {
+      alert("Rezept konnte nicht gefunden werden.");
+      return false;
+    }
+
+    const rezept = rezepte[i];
+    const realId = ensureId170(rezept);
+    const name = rezept.name || "dieses Rezept";
+
+    if (!confirm(`Möchtest du "${name}" wirklich löschen?`)) {
+      return false;
+    }
+
+    const keys = [...localDeletedKeys170(), ...recipeKeys170(rezept)];
+    await saveDeletedKeysCloud170(keys);
+
+    rezepte.splice(i, 1);
+    localStorage.setItem("rezepte", JSON.stringify(rezepte));
+
+    await deleteCloud170(rezept);
+
+    prune170();
+    refresh170();
+
+    if (typeof meldungAnzeigen === "function") {
+      meldungAnzeigen(`Rezept "${name}" gelöscht.`);
+    }
+
+    return true;
+  }
+
+  function rezeptLoeschen(idOderIndex) {
+    deleteRecipeById170(idOderIndex);
+    return false;
+  }
+
+  window.rezeptLoeschen = rezeptLoeschen;
+  window.rf170RezeptLoeschen = deleteRecipeById170;
+
+  // WICHTIG: Ergebnisanzeige überschreiben, damit Buttons echte IDs bekommen.
+  function rezeptKarte170(rezept, index) {
+    const id = ensureId170(rezept);
+    const tags = (rezept.tags || []).map(t => `<span class="tag-chip">${esc170(t)}</span>`).join(" ");
+    return `
+      <article class="rezept-karte">
+        <h3>${esc170(rezept.name || "Unbenanntes Rezept")}</h3>
+        <p><strong>Kategorie:</strong> ${esc170(rezept.kategorie || "Nicht zugeordnet")}</p>
+        <p><strong>Quelle:</strong> ${esc170(rezept.quelle || "Nicht zugeordnet")}</p>
+        <div class="tags">${tags}</div>
+        <div class="button-gruppe">
+          <button type="button" onclick="rezeptAnzeigenDirekt149 ? rezeptAnzeigenDirekt149(${index}) : rezeptAnzeigenDirekt146(${index})">Rezept anzeigen</button>
+          <button type="button" onclick="rezeptBearbeiten(${index})">Bearbeiten</button>
+          <button type="button" onclick="rf170RezeptLoeschen('${esc170(id)}')">Löschen</button>
+        </div>
+      </article>
+    `;
+  }
+
+  function zeigeErgebnisse(liste) {
+    prune170();
+
+    const out = document.getElementById("ergebnisse");
+    if (!out) return;
+
+    const data = (Array.isArray(liste) ? liste : [])
+      .filter(r => !isDeleted170(r));
+
+    if (!data.length) {
+      out.innerHTML = `<div class="box"><p>Keine Rezepte gefunden.</p></div>`;
+      return;
+    }
+
+    out.innerHTML = data.map((r) => {
+      const realIndex = findById170(ensureId170(r));
+      return rezeptKarte170(r, realIndex >= 0 ? realIndex : rezepte.indexOf(r));
+    }).join("");
+  }
+
+  window.zeigeErgebnisse = zeigeErgebnisse;
+
+  async function cloudLoad170() {
+    const client = await client170();
+    if (!client) {
+      alert("Supabase ist nicht verbunden.");
+      return false;
+    }
+
+    if (typeof cloudStatus === "function") cloudStatus("lade globale Löschliste ...");
+    await loadDeletedKeys170();
+
+    if (typeof cloudStatus === "function") cloudStatus("lade aus Cloud ...");
+
+    const { data, error } = await client
+      .from("rezepte")
+      .select("id, name, daten, aktualisiert_am")
+      .order("aktualisiert_am", { ascending: false });
+
+    if (error) {
+      if (typeof cloudStatus === "function") cloudStatus("Laden fehlgeschlagen: " + error.message, true);
+      return false;
+    }
+
+    rezepte = (data || [])
+      .map(row => {
+        const r = row.daten || {};
+        if (!r.id) r.id = row.id;
+        return r;
+      })
+      .filter(r => !isDeleted170(r));
+
+    localStorage.setItem("rezepte", JSON.stringify(rezepte));
+    refresh170();
+
+    if (typeof cloudStatus === "function") cloudStatus(`${rezepte.length} Rezept(e) aus Cloud geladen`);
+    return true;
+  }
+
+  function cloudLaden() { return cloudLoad170(); }
+  function cloudHerunterladen() { return cloudLoad170(); }
+
+  window.cloudLaden = cloudLaden;
+  window.cloudHerunterladen = cloudHerunterladen;
+  window.ausCloudLaden = cloudLoad170;
+
+  window.addEventListener("load", function() {
+    loadDeletedKeys170().then(function() {
+      prune170();
+    });
+  });
+})();
+
+
+
+// =====================================================
+// VERSION 1.71: Cloud-Download überschreibt lokale Handy-Liste hart
+// Problem: Handy behält alte 21 Rezepte. Lösung:
+// Beim Cloud-Herunterladen wird localStorage komplett mit Cloud-Daten ersetzt.
+// =====================================================
+
+(function () {
+  const RF171_DELETED_ROW_ID = "__rezeptfinder_deleted_keys__";
+  let rf171Busy = false;
+
+  function rf171Status(text, error) {
+    try {
+      if (typeof cloudStatus === "function") cloudStatus(text, !!error);
+      else console.log(text);
+    } catch (e) {
+      console.log(text);
+    }
+  }
+
+  function rf171KeysLocal() {
+    try {
+      return JSON.parse(localStorage.getItem("geloeschteRezeptKeys") || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function rf171SaveKeys(keys) {
+    const clean = [...new Set((keys || []).filter(Boolean).map(String))];
+    localStorage.setItem("geloeschteRezeptKeys", JSON.stringify(clean));
+    return clean;
+  }
+
+  function rf171RecipeKeys(r) {
+    if (!r) return [];
+    const keys = [];
+    if (r.id) {
+      keys.push(String(r.id));
+      keys.push("id:" + String(r.id));
+    }
+    if (r.cloud_id) {
+      keys.push(String(r.cloud_id));
+      keys.push("id:" + String(r.cloud_id));
+    }
+    if (r.uuid) {
+      keys.push(String(r.uuid));
+      keys.push("id:" + String(r.uuid));
+    }
+    if (r.name) {
+      keys.push("name:" + String(r.name || "").trim().toLowerCase() + "|quelle:" + String(r.quelle || "").trim().toLowerCase());
+    }
+    return [...new Set(keys.filter(Boolean))];
+  }
+
+  function rf171IsSystemOrDeleted(r) {
+    if (!r) return true;
+    if (r.id === RF171_DELETED_ROW_ID || r.__system === "deleted_keys" || r.system_typ === "deleted_keys") return true;
+    if (r.geloescht || r.deleted || r.__deleted) return true;
+
+    const keys = new Set(rf171KeysLocal().map(String));
+    return rf171RecipeKeys(r).some(k => keys.has(String(k)));
+  }
+
+  async function rf171Client() {
+    try { if (typeof cloudInit === "function") cloudInit(); } catch (e) {}
+    const client = typeof supabaseClient !== "undefined" ? supabaseClient : null;
+    if (!client) throw new Error("Supabase ist nicht verbunden.");
+    return client;
+  }
+
+  async function rf171DeletedKeysAusCloudLaden(client) {
+    try {
+      const { data, error } = await client
+        .from("rezepte")
+        .select("id, daten")
+        .eq("id", RF171_DELETED_ROW_ID)
+        .maybeSingle();
+
+      if (error && error.code !== "PGRST116") {
+        console.warn("Globale Löschliste laden Fehler:", error);
+      }
+
+      const remote = data && data.daten && Array.isArray(data.daten.keys) ? data.daten.keys : [];
+      return rf171SaveKeys([...rf171KeysLocal(), ...remote]);
+    } catch (e) {
+      console.warn("Globale Löschliste konnte nicht geladen werden:", e);
+      return rf171KeysLocal();
+    }
+  }
+
+  function rf171NormalizeCloudRows(rows) {
+    return (rows || [])
+      .map(row => {
+        const r = row.daten || {};
+        if (!r.id) r.id = row.id;
+        return r;
+      })
+      .filter(r => !rf171IsSystemOrDeleted(r));
+  }
+
+  function rf171RefreshViews() {
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch (e) {}
+    try { if (typeof suchTagsDropdownAktualisieren === "function") suchTagsDropdownAktualisieren(); } catch (e) {}
+    try { if (typeof quellenDropdownAktualisieren === "function") quellenDropdownAktualisieren(); } catch (e) {}
+    try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch (e) {}
+  }
+
+  async function rf171ForceCloudDownload() {
+    if (rf171Busy) return false;
+    rf171Busy = true;
+
+    try {
+      rf171Status("lade aus Cloud ...");
+
+      const client = await rf171Client();
+
+      // 1. Globale Löschliste zuerst laden
+      await rf171DeletedKeysAusCloudLaden(client);
+
+      // 2. Cloud-Rezepte laden
+      const { data, error } = await client
+        .from("rezepte")
+        .select("id, name, daten, aktualisiert_am")
+        .order("aktualisiert_am", { ascending: false });
+
+      if (error) throw error;
+
+      const cloudRezepte = rf171NormalizeCloudRows(data);
+
+      // 3. Harter Overwrite: Handy-Liste NICHT mergen, sondern ersetzen
+      rezepte = cloudRezepte;
+      localStorage.setItem("rezepte", JSON.stringify(rezepte));
+
+      // 4. Optional Datenstruktur reparieren, aber danach erneut filtern/speichern
+      try {
+        if (typeof datenstrukturReparieren === "function") datenstrukturReparieren();
+      } catch (e) {
+        console.warn("Datenstruktur-Reparatur übersprungen:", e);
+      }
+
+      rezepte = (Array.isArray(rezepte) ? rezepte : []).filter(r => !rf171IsSystemOrDeleted(r));
+      localStorage.setItem("rezepte", JSON.stringify(rezepte));
+
+      rf171RefreshViews();
+
+      rf171Status(`${rezepte.length} Rezept(e) aus Cloud geladen`);
+      alert(`${rezepte.length} Rezept(e) aus Cloud geladen.`);
+      return true;
+    } catch (e) {
+      console.error("Cloud-Download v1.71 fehlgeschlagen:", e);
+      rf171Status("Cloud-Download fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Download fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      rf171Busy = false;
+    }
+  }
+
+  async function rf171CloudUploadCurrent() {
+    if (rf171Busy) return false;
+    rf171Busy = true;
+
+    try {
+      const client = await rf171Client();
+
+      // lokale gelöschte/system-Einträge entfernen
+      rezepte = (Array.isArray(rezepte) ? rezepte : []).filter(r => !rf171IsSystemOrDeleted(r));
+      localStorage.setItem("rezepte", JSON.stringify(rezepte));
+
+      const rows = rezepte.map(rezept => {
+        if (!rezept.id) {
+          try {
+            rezept.id = crypto && crypto.randomUUID ? crypto.randomUUID() : "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+          } catch (e) {
+            rezept.id = "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+          }
+        }
+
+        return {
+          id: String(rezept.id),
+          name: rezept.name || "Unbenanntes Rezept",
+          daten: JSON.parse(JSON.stringify(rezept)),
+          aktualisiert_am: new Date().toISOString()
+        };
+      });
+
+      const { error } = await client
+        .from("rezepte")
+        .upsert(rows, { onConflict: "id" });
+
+      if (error) throw error;
+
+      localStorage.setItem("rezepte", JSON.stringify(rezepte));
+      rf171Status(`${rows.length} Rezept(e) in Cloud gespeichert`);
+      alert(`${rows.length} Rezept(e) in Cloud gespeichert.`);
+      return true;
+    } catch (e) {
+      console.error("Cloud-Speichern v1.71 fehlgeschlagen:", e);
+      rf171Status("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      rf171Busy = false;
+    }
+  }
+
+  // Alle möglichen alten Cloud-Funktionsnamen hart ersetzen
+  function cloudLaden() { return rf171ForceCloudDownload(); }
+  function cloudHerunterladen() { return rf171ForceCloudDownload(); }
+  function ausCloudLaden() { return rf171ForceCloudDownload(); }
+
+  function cloudSpeichernAlle() { return rf171CloudUploadCurrent(); }
+  function cloudSpeichernAlleDirekt() { return rf171CloudUploadCurrent(); }
+  function cloudSpeichernAlleDirekt1294() { return rf171CloudUploadCurrent(); }
+
+  window.rf171ForceCloudDownload = rf171ForceCloudDownload;
+  window.rf171CloudUploadCurrent = rf171CloudUploadCurrent;
+
+  window.cloudLaden = cloudLaden;
+  window.cloudHerunterladen = cloudHerunterladen;
+  window.ausCloudLaden = ausCloudLaden;
+
+  window.cloudSpeichernAlle = cloudSpeichernAlle;
+  window.cloudSpeichernAlleDirekt = cloudSpeichernAlleDirekt;
+  window.cloudSpeichernAlleDirekt1294 = cloudSpeichernAlleDirekt1294;
+
+  // Buttons zusätzlich direkt nach Text binden, falls sie alte Inline-Handler haben.
+  function rf171BindCloudButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").toLowerCase();
+
+      if (text.includes("cloud") && (text.includes("laden") || text.includes("herunter"))) {
+        btn.type = "button";
+        btn.onclick = function (event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf171ForceCloudDownload();
+          return false;
+        };
+      }
+
+      if (text.includes("cloud") && (text.includes("speichern") || text.includes("hochladen"))) {
+        btn.type = "button";
+        btn.onclick = function (event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf171CloudUploadCurrent();
+          return false;
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function () {
+    rf171BindCloudButtons();
+    setTimeout(rf171BindCloudButtons, 500);
+    setTimeout(rf171BindCloudButtons, 1500);
+  });
+})();
+
+
+
+// =====================================================
+// VERSION 1.72: Cloud-Speichern zählt neue Rezepte korrekt
+// Problem: Cloud blieb bei 14, weil alte globale Variable/alter Uploadweg genutzt wurde.
+// Lösung: Vor Upload immer aktuelle localStorage-Liste laden und dann komplett hochladen.
+// =====================================================
+
+(function () {
+  const RF172_DELETED_ROW_ID = "__rezeptfinder_deleted_keys__";
+  let rf172Busy = false;
+
+  function rf172Status(text, error) {
+    try {
+      if (typeof cloudStatus === "function") cloudStatus(text, !!error);
+      else console.log(text);
+    } catch (e) {
+      console.log(text);
+    }
+  }
+
+  function rf172ReadLocalRecipes() {
+    let local = [];
+    try {
+      local = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch (e) {
+      local = [];
+    }
+
+    // Falls Arbeitsspeicher mehr enthält als localStorage, das ebenfalls berücksichtigen.
+    if (Array.isArray(rezepte) && rezepte.length > local.length) {
+      local = rezepte;
+    }
+
+    return Array.isArray(local) ? local : [];
+  }
+
+  function rf172DeletedKeys() {
+    try {
+      return JSON.parse(localStorage.getItem("geloeschteRezeptKeys") || "[]");
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function rf172RecipeKeys(r) {
+    if (!r) return [];
+    const keys = [];
+    if (r.id) {
+      keys.push(String(r.id));
+      keys.push("id:" + String(r.id));
+    }
+    if (r.name) {
+      keys.push("name:" + String(r.name || "").trim().toLowerCase() + "|quelle:" + String(r.quelle || "").trim().toLowerCase());
+    }
+    return keys;
+  }
+
+  function rf172IsDeletedOrSystem(r) {
+    if (!r) return true;
+    if (r.id === RF172_DELETED_ROW_ID || r.__system === "deleted_keys" || r.system_typ === "deleted_keys") return true;
+    if (r.geloescht || r.deleted || r.__deleted) return true;
+
+    const keys = new Set(rf172DeletedKeys().map(String));
+    return rf172RecipeKeys(r).some(k => keys.has(String(k)));
+  }
+
+  function rf172EnsureId(r) {
+    if (!r.id) {
+      try {
+        r.id = crypto && crypto.randomUUID ? crypto.randomUUID() : "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+      } catch (e) {
+        r.id = "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+      }
+    }
+    return r;
+  }
+
+  async function rf172Client() {
+    try {
+      if (typeof cloudInit === "function") cloudInit();
+    } catch (e) {}
+    const client = typeof supabaseClient !== "undefined" ? supabaseClient : null;
+    if (!client) throw new Error("Supabase ist nicht verbunden.");
+    return client;
+  }
+
+  async function rf172CloudSaveAll() {
+    if (rf172Busy) return false;
+    rf172Busy = true;
+
+    try {
+      rf172Status("speichere in Cloud ...");
+
+      const client = await rf172Client();
+
+      let localRecipes = rf172ReadLocalRecipes()
+        .filter(r => !rf172IsDeletedOrSystem(r))
+        .map(r => rf172EnsureId(r));
+
+      // Arbeitsspeicher und localStorage synchron halten
+      rezepte = localRecipes;
+      localStorage.setItem("rezepte", JSON.stringify(rezepte));
+
+      const rows = localRecipes.map(rezept => ({
+        id: String(rezept.id),
+        name: rezept.name || "Unbenanntes Rezept",
+        daten: JSON.parse(JSON.stringify(rezept)),
+        aktualisiert_am: new Date().toISOString()
+      }));
+
+      if (rows.length) {
+        const { error } = await client
+          .from("rezepte")
+          .upsert(rows, { onConflict: "id" });
+
+        if (error) throw error;
+      }
+
+      // Wichtig: Cloud nicht löschen/ersetzen, aber gelöschte/Systemeinträge bleiben gefiltert.
+      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch (e) {}
+      try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch (e) {}
+
+      rf172Status(`${rows.length} Rezept(e) in Cloud gespeichert`);
+      alert(`${rows.length} Rezept(e) in Cloud gespeichert.`);
+      return true;
+    } catch (e) {
+      console.error("Cloud-Speichern v1.72 fehlgeschlagen:", e);
+      rf172Status("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      rf172Busy = false;
+    }
+  }
+
+  async function rf172CloudDownloadOverwrite() {
+    if (rf172Busy) return false;
+    rf172Busy = true;
+
+    try {
+      rf172Status("lade aus Cloud ...");
+      const client = await rf172Client();
+
+      const { data, error } = await client
+        .from("rezepte")
+        .select("id, name, daten, aktualisiert_am")
+        .order("aktualisiert_at", { ascending: false });
+
+      // Falls Spaltenname aktualisiert_at nicht existiert, Fallback mit aktualisiert_am.
+      let rowsData = data;
+      if (error) {
+        const res2 = await client
+          .from("rezepte")
+          .select("id, name, daten, aktualisiert_am")
+          .order("aktualisiert_am", { ascending: false });
+        if (res2.error) throw res2.error;
+        rowsData = res2.data;
+      }
+
+      const loaded = (rowsData || [])
+        .map(row => {
+          const r = row.daten || {};
+          if (!r.id) r.id = row.id;
+          return r;
+        })
+        .filter(r => !rf172IsDeletedOrSystem(r));
+
+      rezepte = loaded;
+      localStorage.setItem("rezepte", JSON.stringify(rezepte));
+
+      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch (e) {}
+      try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch (e) {}
+
+      rf172Status(`${rezepte.length} Rezept(e) aus Cloud geladen`);
+      alert(`${rezepte.length} Rezept(e) aus Cloud geladen.`);
+      return true;
+    } catch (e) {
+      console.error("Cloud-Laden v1.72 fehlgeschlagen:", e);
+      rf172Status("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      rf172Busy = false;
+    }
+  }
+
+  function cloudSpeichernAlle() { return rf172CloudSaveAll(); }
+  function cloudSpeichernAlleDirekt() { return rf172CloudSaveAll(); }
+  function cloudSpeichernAlleDirekt1294() { return rf172CloudSaveAll(); }
+
+  function cloudLaden() { return rf172CloudDownloadOverwrite(); }
+  function cloudHerunterladen() { return rf172CloudDownloadOverwrite(); }
+  function ausCloudLaden() { return rf172CloudDownloadOverwrite(); }
+
+  window.rf172CloudSaveAll = rf172CloudSaveAll;
+  window.rf172CloudDownloadOverwrite = rf172CloudDownloadOverwrite;
+
+  window.cloudSpeichernAlle = cloudSpeichernAlle;
+  window.cloudSpeichernAlleDirekt = cloudSpeichernAlleDirekt;
+  window.cloudSpeichernAlleDirekt1294 = cloudSpeichernAlleDirekt1294;
+
+  window.cloudLaden = cloudLaden;
+  window.cloudHerunterladen = cloudHerunterladen;
+  window.ausCloudLaden = ausCloudLaden;
+
+  function rf172BindButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").toLowerCase();
+
+      if (text.includes("cloud") && text.includes("speichern")) {
+        btn.type = "button";
+        btn.onclick = function (event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf172CloudSaveAll();
+          return false;
+        };
+      }
+
+      if (text.includes("cloud") && (text.includes("laden") || text.includes("herunter"))) {
+        btn.type = "button";
+        btn.onclick = function (event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          rf172CloudDownloadOverwrite();
+          return false;
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function () {
+    rf172BindButtons();
+    setTimeout(rf172BindButtons, 500);
+    setTimeout(rf172BindButtons, 1500);
   });
 })();
