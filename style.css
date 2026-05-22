@@ -537,3 +537,90 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 #suchKategorieKacheln {
   display: none !important;
 }
+
+
+/* VERSION 1.81 Einkaufsliste schöner */
+#einkaufslisteBereich,
+#einkaufsliste,
+.einkaufsliste {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+#einkaufslisteInhalt,
+#einkaufslisteListe,
+.einkaufsliste-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.einkaufsliste-item,
+.einkaufslisten-item,
+.shopping-item,
+#einkaufslisteBereich li {
+  display: grid !important;
+  grid-template-columns: 34px 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 14px 18px;
+  margin: 10px 0;
+  min-height: 64px;
+  overflow: hidden;
+}
+
+.einkaufsliste-item input[type="checkbox"],
+.einkaufslisten-item input[type="checkbox"],
+.shopping-item input[type="checkbox"],
+#einkaufslisteBereich li input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  justify-self: center;
+}
+
+.einkaufsliste-menge,
+.einkaufslisten-menge,
+.shopping-menge,
+.einkauf-menge {
+  font-weight: 700;
+  white-space: nowrap;
+  color: #111827;
+  text-align: right;
+}
+
+.einkaufsliste-name,
+.einkaufslisten-name,
+.shopping-name,
+.einkauf-name {
+  min-width: 0;
+  color: #111827;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* Falls Menge und Name bisher als normaler Text rechts herausrutschen */
+#einkaufslisteBereich label,
+#einkaufslisteBereich .item-text,
+#einkaufslisteBereich .zutaten-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Mobile: Menge und Zutat enger anzeigen */
+@media (max-width: 700px) {
+  .einkaufsliste-item,
+  .einkaufslisten-item,
+  .shopping-item,
+  #einkaufslisteBereich li {
+    grid-template-columns: 30px 80px minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px;
+  }
+}
