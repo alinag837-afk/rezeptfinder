@@ -25136,3 +25136,342 @@ window.addEventListener("load", function () {
     setTimeout(rf204StyleBackupButton, 2500);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.05 STABILISIERUNG
+// Zentrale Steuerung für Startseite, Backup, Assistent, Speichern.
+// Alte widersprüchliche Funktionen werden dadurch übersteuert.
+// =====================================================
+
+(function () {
+  const RF205_VERSION = "2.05";
+
+  function q(id) {
+    return document.getElementById(id);
+  }
+
+  function show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+    el.classList.remove("rf205-hidden");
+  }
+
+  function hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = "none";
+    el.classList.add("versteckt");
+  }
+
+  function hideAllMainAreas() {
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich", "rf205BackupPanel"].forEach(id => hide(q(id)));
+  }
+
+  function clearResults() {
+    const ergebnisse = q("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      hide(ergebnisse);
+    }
+  }
+
+  function goStartClean() {
+    document.body.classList.add("rf205-start");
+    hideAllMainAreas();
+    clearResults();
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(e) {}
+  }
+
+  function leaveStart() {
+    document.body.classList.remove("rf205-start");
+    const ergebnisse = q("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.hidden = false;
+      ergebnisse.style.display = "";
+    }
+  }
+
+  window.rf205GoStartClean = goStartClean;
+  window.rf205LeaveStart = leaveStart;
+
+  // -------------------------------
+  // Backup
+  // -------------------------------
+
+  function backupToggle() {
+    document.body.classList.remove("rf205-start");
+    const panel = q("rf205BackupPanel");
+    const button = q("rf205BackupToggle");
+    if (!panel || !button) return false;
+
+    const closed = panel.classList.contains("versteckt") || panel.hidden || panel.style.display === "none";
+
+    if (closed) {
+      hideAllMainAreas();
+      show(panel);
+      button.textContent = "Backup einklappen";
+    } else {
+      hide(panel);
+      button.textContent = "Backup anzeigen";
+    }
+
+    return false;
+  }
+
+  function runBackupAction(action) {
+    try {
+      if (action === "cloud-save") {
+        if (typeof window.cloudSpeichernAlle === "function") return window.cloudSpeichernAlle();
+        if (typeof cloudSpeichernAlle === "function") return cloudSpeichernAlle();
+      }
+
+      if (action === "cloud-load") {
+        if (typeof window.cloudLaden === "function") return window.cloudLaden();
+        if (typeof cloudLaden === "function") return cloudLaden();
+      }
+
+      if (action === "cloud-backups") {
+        const names = ["cloudBackupsAnzeigen", "cloudBackupAnzeigen", "backupsAnzeigen"];
+        for (const name of names) {
+          if (typeof window[name] === "function") return window[name]();
+          try { if (typeof globalThis[name] === "function") return globalThis[name](); } catch(e) {}
+        }
+      }
+
+      if (action === "manual-backup") {
+        const names = ["backupHerunterladen", "backupExportieren", "datenExportieren", "manuellesBackupHerunterladen"];
+        for (const name of names) {
+          if (typeof window[name] === "function") return window[name]();
+          try { if (typeof globalThis[name] === "function") return globalThis[name](); } catch(e) {}
+        }
+      }
+    } catch (e) {
+      console.error("Backup-Aktion fehlgeschlagen:", e);
+      alert("Backup-Aktion fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    }
+
+    alert("Diese Backup-Funktion wurde nicht gefunden.");
+    return false;
+  }
+
+  function setupBackup() {
+    const btn = q("rf205BackupToggle");
+    if (btn) {
+      btn.onclick = backupToggle;
+      btn.hidden = false;
+      btn.style.display = "inline-flex";
+    }
+
+    document.querySelectorAll("[data-rf205-action]").forEach(button => {
+      button.onclick = function () {
+        return runBackupAction(button.dataset.rf205Action);
+      };
+    });
+  }
+
+  // -------------------------------
+  // Assistent
+  // -------------------------------
+
+  function resetAssistant() {
+    const input = q("textImportInput");
+    if (input) input.value = "";
+
+    const status = q("assistentStatus");
+    if (status) status.textContent = "";
+
+    const preview = q("assistentVorschau");
+    if (preview) {
+      preview.innerHTML = "";
+      preview.hidden = false;
+      preview.style.display = "";
+      preview.classList.remove("versteckt");
+    }
+
+    try {
+      window.rf153LetzteAnalyse = null;
+      window.letzteAnalyse = null;
+      window.assistentAnalyse = null;
+      window.rfAnalyseErgebnis = null;
+    } catch(e) {}
+  }
+
+  function openAssistant() {
+    leaveStart();
+    hideAllMainAreas();
+    const assistent = q("textImportBereich");
+    show(assistent);
+    resetAssistant();
+    bindAnalyzeButton();
+  }
+
+  function closeAssistantOpenForm() {
+    const assistent = q("textImportBereich");
+    hide(assistent);
+
+    const input = q("textImportInput");
+    if (input) input.value = "";
+
+    const preview = q("assistentVorschau");
+    if (preview) {
+      preview.innerHTML = "";
+      hide(preview);
+    }
+
+    const form = q("formularBereich");
+    show(form);
+    try { form && form.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+  }
+
+  function bindAnalyzeButton() {
+    const button = q("rezeptAnalysierenButton");
+    if (!button) return;
+
+    button.type = "button";
+    button.onclick = function (event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      if (typeof window.rf153AssistentVorschau === "function") return window.rf153AssistentVorschau();
+      if (typeof window.rezeptAnalysierenDirektFinal === "function") return window.rezeptAnalysierenDirektFinal();
+      if (typeof window.rezeptAnalysierenDirekt === "function") return window.rezeptAnalysierenDirekt();
+      try { if (typeof rf153AssistentVorschau === "function") return rf153AssistentVorschau(); } catch(e) {}
+
+      alert("Rezept analysieren ist derzeit nicht verfügbar.");
+      return false;
+    };
+  }
+
+  // Klick auf Vorschau-Übernahme: Assistent schließen
+  document.addEventListener("click", function (event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+    const inPreview = btn.closest && btn.closest("#assistentVorschau");
+
+    if (
+      inPreview ||
+      text.includes("ins formular") ||
+      text.includes("in formular") ||
+      text.includes("übernehmen") ||
+      text.includes("uebernehmen")
+    ) {
+      setTimeout(closeAssistantOpenForm, 100);
+      setTimeout(closeAssistantOpenForm, 400);
+    }
+  }, true);
+
+  // -------------------------------
+  // Speichern: nach Startseite zurück
+  // -------------------------------
+
+  function wrapSave(name) {
+    const fn = window[name] || (typeof globalThis !== "undefined" ? globalThis[name] : null);
+    if (typeof fn !== "function" || fn.__rf205Wrapped) return;
+
+    const wrapped = function () {
+      const result = fn.apply(this, arguments);
+      setTimeout(goStartClean, 200);
+      setTimeout(goStartClean, 600);
+      return result;
+    };
+
+    wrapped.__rf205Wrapped = true;
+    window[name] = wrapped;
+    try { globalThis[name] = wrapped; } catch(e) {}
+  }
+
+  ["rf186SaveRecipe", "rezeptSpeichern", "rezeptSpeichernDirektCloud", "rf155RezeptSpeichern"].forEach(wrapSave);
+
+  // -------------------------------
+  // Hauptnavigation
+  // -------------------------------
+
+  function bindMainButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (text === "rezept-assistent") {
+        btn.onclick = function () {
+          openAssistant();
+          return false;
+        };
+      }
+
+      if (text === "rezept speichern" || text === "speichern") {
+        if (!btn.__rf205SaveBound) {
+          const old = btn.onclick;
+          btn.onclick = function (event) {
+            const result = old ? old.call(this, event) : true;
+            setTimeout(goStartClean, 250);
+            return result;
+          };
+          btn.__rf205SaveBound = true;
+        }
+      }
+
+      if (
+        text === "rezepte suchen" ||
+        text === "alle rezepte anzeigen" ||
+        text === "suchen"
+      ) {
+        btn.addEventListener("click", leaveStart, true);
+      }
+
+      if (
+        text === "rezept hinzufügen" ||
+        text === "einkaufsliste" ||
+        text === "rezepte prüfen"
+      ) {
+        btn.addEventListener("click", function () {
+          leaveStart();
+          clearResults();
+        }, true);
+      }
+    });
+
+    bindAnalyzeButton();
+  }
+
+  // -------------------------------
+  // Cache einmalig aktualisieren
+  // -------------------------------
+
+  async function clearOldCaches() {
+    try { localStorage.setItem("rezeptfinder_version", RF205_VERSION); } catch(e) {}
+
+    try {
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map(name => caches.delete(name)));
+      }
+    } catch(e) {}
+
+    try {
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.unregister();
+      }
+    } catch(e) {}
+  }
+
+  window.addEventListener("load", function () {
+    setupBackup();
+    bindMainButtons();
+    goStartClean();
+    clearOldCaches();
+
+    setTimeout(setupBackup, 300);
+    setTimeout(bindMainButtons, 500);
+    setTimeout(goStartClean, 900);
+    setTimeout(bindMainButtons, 1500);
+  });
+})();
