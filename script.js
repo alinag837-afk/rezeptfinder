@@ -26105,3 +26105,183 @@ window.addEventListener("load", function () {
     setTimeout(bind, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.09 Fix: Rezepte prüfen funktioniert wieder
+// =====================================================
+
+(function () {
+  function rf209El(id) {
+    return document.getElementById(id);
+  }
+
+  function rf209Show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+  }
+
+  function rf209Hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = "none";
+    el.classList.add("versteckt");
+  }
+
+  function rf209LoadRezepte() {
+    try {
+      const raw = localStorage.getItem("rezepte");
+      if (raw) {
+        window.rezepte = JSON.parse(raw) || [];
+        try { rezepte = window.rezepte; } catch(e) {}
+      }
+    } catch (e) {}
+
+    if (!Array.isArray(window.rezepte)) {
+      try {
+        if (Array.isArray(rezepte)) window.rezepte = rezepte;
+      } catch(e) {}
+    }
+
+    if (!Array.isArray(window.rezepte)) window.rezepte = [];
+    return window.rezepte;
+  }
+
+  function rf209CreateReport() {
+    const liste = rf209LoadRezepte();
+    const probleme = [];
+
+    liste.forEach((r, index) => {
+      const nr = index + 1;
+      const name = r && r.name ? r.name : "Rezept " + nr;
+
+      if (!r || !r.name || !String(r.name).trim()) {
+        probleme.push({ typ: "Fehlt", text: "Rezept " + nr + ": Name fehlt." });
+      }
+
+      const zutaten = r && (Array.isArray(r.zutaten) ? r.zutaten : []);
+      const gruppen = r && (Array.isArray(r.zutatenGruppen) ? r.zutatenGruppen : []);
+      const hatZutaten = zutaten.length > 0 || gruppen.some(g => Array.isArray(g.zutaten) && g.zutaten.length);
+
+      if (!hatZutaten) {
+        probleme.push({ typ: "Fehlt", text: name + ": Zutaten fehlen." });
+      }
+
+      if (!r || !r.zubereitung || !String(r.zubereitung).trim()) {
+        probleme.push({ typ: "Fehlt", text: name + ": Zubereitung fehlt." });
+      }
+
+      if (!r || !r.kategorie || String(r.kategorie).trim() === "") {
+        probleme.push({ typ: "Hinweis", text: name + ": Kategorie fehlt." });
+      }
+
+      if (!r || !r.portionen || String(r.portionen).trim() === "") {
+        probleme.push({ typ: "Hinweis", text: name + ": Portionen fehlen." });
+      }
+    });
+
+    return { anzahl: liste.length, probleme };
+  }
+
+  function rf209RenderReport() {
+    const container = rf209El("datenpruefungInhalt");
+    if (!container) return false;
+
+    const report = rf209CreateReport();
+
+    if (!report.anzahl) {
+      container.innerHTML = "<p>Es sind noch keine Rezepte gespeichert.</p>";
+      return true;
+    }
+
+    if (!report.probleme.length) {
+      container.innerHTML = `
+        <div class="box">
+          <h3>Prüfung abgeschlossen</h3>
+          <p>Keine offensichtlichen Probleme gefunden.</p>
+          <p>Geprüfte Rezepte: ${report.anzahl}</p>
+        </div>
+      `;
+      return true;
+    }
+
+    container.innerHTML = `
+      <div class="box">
+        <h3>Prüfung abgeschlossen</h3>
+        <p>Geprüfte Rezepte: ${report.anzahl}</p>
+        <p>Gefundene Hinweise/Probleme: ${report.probleme.length}</p>
+        <ul>
+          ${report.probleme.map(p => `<li><strong>${p.typ}:</strong> ${p.text}</li>`).join("")}
+        </ul>
+      </div>
+    `;
+
+    return true;
+  }
+
+  function rf209RezeptePruefenOeffnen() {
+    document.body.classList.remove("rf205-start");
+    document.body.classList.remove("rf196-startseite");
+    document.body.classList.remove("startseite-clean");
+
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich"].forEach(id => rf209Hide(rf209El(id)));
+
+    const ergebnisse = rf209El("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      rf209Hide(ergebnisse);
+    }
+
+    const bereich = rf209El("datenpruefungBereich");
+    rf209Show(bereich);
+
+    // Eigene zuverlässige Prüfung rendern. Keine alten Toggle-Funktionen mehr.
+    rf209RenderReport();
+
+    try { bereich && bereich.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    return false;
+  }
+
+  window.rf209RezeptePruefenOeffnen = rf209RezeptePruefenOeffnen;
+  window.datenqualitaetPruefen = rf209RenderReport;
+  window.datenPruefen = rf209RezeptePruefenOeffnen;
+  window.rezeptePruefen = rf209RezeptePruefenOeffnen;
+
+  function rf209Bind() {
+    const byId = document.getElementById("rf207RezeptePruefen");
+    if (byId) {
+      byId.type = "button";
+      byId.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return rf209RezeptePruefenOeffnen();
+      };
+    }
+
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      if (text === "rezepte prüfen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf209RezeptePruefenOeffnen();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    rf209Bind();
+    setTimeout(rf209Bind, 300);
+    setTimeout(rf209Bind, 1000);
+    setTimeout(rf209Bind, 2000);
+  });
+})();
