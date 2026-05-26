@@ -995,3 +995,20 @@ body.rf196-startseite #datenpruefungBereich {
   align-items: center !important;
   justify-content: center !important;
 }
+
+
+/* VERSION 2.07 stabiler Update-Button */
+#rf207UpdateButton {
+  background: #3478f6 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 18px !important;
+  padding: 20px 34px !important;
+  min-width: 360px !important;
+  min-height: 74px !important;
+  font-size: 26px !important;
+  font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
