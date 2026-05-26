@@ -1265,3 +1265,54 @@ button[id^="rf204"] {
 #rf205BackupToggle {
   display: none !important;
 }
+
+
+/* VERSION 2.13 Backup einklappen exakt wie andere Buttons */
+#backupStartButton {
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
+
+  height: 74px !important;
+  min-height: 74px !important;
+  max-height: 74px !important;
+
+  padding: 0 24px !important;
+  margin: 10px 12px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  background: #2f7df6 !important;
+  color: #ffffff !important;
+
+  border: none !important;
+  border-radius: 12px !important;
+
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  flex: 0 0 auto !important;
+
+  font-family: inherit !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+#backupStartButton:hover {
+  filter: brightness(0.97);
+}
+
+@media (max-width: 900px) {
+  #backupStartButton {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
