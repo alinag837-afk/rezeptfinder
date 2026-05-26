@@ -1199,3 +1199,69 @@ button[id^="rf204"] {
   padding: 14px 18px !important;
   font-size: 1rem !important;
 }
+
+
+/* VERSION 2.12 Backup-Bereich wirklich sauber */
+#backupStartButton {
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
+  height: 74px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #2f7df6 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 0 24px !important;
+  margin: 10px 12px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+}
+
+#backupStartPanel.versteckt {
+  display: none !important;
+}
+
+#backupStartPanel {
+  margin-top: 18px !important;
+}
+
+#backupCleanGrid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+  gap: 16px !important;
+  margin-top: 20px !important;
+}
+
+#backupCleanGrid button {
+  width: 100% !important;
+  height: 70px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 14px 18px !important;
+  font-size: 1rem !important;
+  border-radius: 12px !important;
+}
+
+/* Alle alten Backup-Panels und alte Backup-Buttons verstecken */
+#rf197BackupPanel,
+#rf200BackupPanel,
+#rf201BackupPanel,
+#rf202BackupPanel,
+#rf203BackupPanel,
+#rf204BackupPanel,
+#rf205BackupPanel,
+#rf197BackupToggle,
+#rf200BackupToggle,
+#rf201BackupToggle,
+#rf202BackupToggle,
+#rf203BackupToggle,
+#rf204BackupToggle,
+#rf205BackupToggle {
+  display: none !important;
+}

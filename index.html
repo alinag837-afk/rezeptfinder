@@ -8,8 +8,8 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v2.11 Cloud</title>
-  <link rel="stylesheet" href="style.css?v=211">
+  <title>Rezeptfinder v2.12 Cloud</title>
+  <link rel="stylesheet" href="style.css?v=212">
 </head>
 <body>
 <main class="container">
@@ -27,7 +27,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v2.11 Cloud</p>
+    <p class="version">Rezeptfinder v2.12 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -55,7 +55,7 @@
     
     <button onclick="rezeptAssistentToggle()">Rezept-Assistent</button>
     <button onclick="hauptbereichToggle('datenpruefungBereich', false, false, true)">Rezepte prüfen</button>
-    <button id="backupStartButton" class="start-button" type="button" onclick="backupStartToggle()">Backup anzeigen</button>
+    <button id="backupStartButton" type="button" onclick="backupStartToggle()">Backup anzeigen</button>
 </section>
 
   
@@ -279,23 +279,17 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
 
-
 <section id="backupStartPanel" class="box versteckt">
   <h2>Backup</h2>
-  <p>Hier findest du deine Cloud-Backup-Funktionen.</p>
-  <div class="button-gruppe backup-grid">
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="backupCloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-  </div>
+  <p>Hier findest du deine Cloud-Funktionen.</p>
+  <div id="backupCleanGrid" class="backup-clean-grid"></div>
 </section>
 
-
 <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v2.11 Cloud</footer>
+  <footer>Rezeptfinder v2.12 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=211"></script>
+  <script src="script.js?v=212"></script>
 
 <select id="bewertungFilter" class="versteckt"><option value=""></option></select>
 <div id="schnellfilterInhalt" class="versteckt"></div>
