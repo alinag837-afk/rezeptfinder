@@ -8,7 +8,7 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v2.04 Cloud</title>
+  <title>Rezeptfinder v2.02 Cloud</title>
   <link rel="stylesheet" href="style.css?v=199">
 </head>
 <body>
@@ -27,7 +27,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v2.04 Cloud</p>
+    <p class="version">Rezeptfinder v2.02 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -36,14 +36,17 @@
       
         <div class="button-gruppe">
           <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-</div>
-        <div id="offlineStatusText" class="offline-status">
-</div>
-        <div id="cloudBackupPanel" class="cloud-backup-panel">
-</div>
-</div>
-    <div id="rezeptDesTagesBox" class="rezept-des-tages">
-</div>
+          
+            <button id="rf202BackupToggle" type="button" onclick="rf202BackupToggle()">Backup anzeigen</button>
+  </div>
+        <div id="offlineStatusText" class="offline-status">    <button id="rf202BackupToggle" type="button" onclick="rf202BackupToggle()">Backup anzeigen</button>
+  </div>
+        <div id="cloudBackupPanel" class="cloud-backup-panel">    <button id="rf202BackupToggle" type="button" onclick="rf202BackupToggle()">Backup anzeigen</button>
+  </div>
+          <button id="rf202BackupToggle" type="button" onclick="rf202BackupToggle()">Backup anzeigen</button>
+  </div>
+    <div id="rezeptDesTagesBox" class="rezept-des-tages">    <button id="rf202BackupToggle" type="button" onclick="rf202BackupToggle()">Backup anzeigen</button>
+  </div>
   </section>
 
   <section class="box start-buttons">
@@ -89,7 +92,8 @@
     <button class="kategorie-kachel" data-kategorie="Pralinen" onclick="kategorieKachelUmschalten(this)">Pralinen</button>
     <button class="kategorie-kachel" data-kategorie="Sonstiges" onclick="kategorieKachelUmschalten(this)">Sonstiges</button>
     <button class="kategorie-kachel" data-kategorie="Airfryer" onclick="kategorieKachelUmschalten(this)">Airfryer</button>
-</div>
+      <button id="rf202BackupToggle" type="button" onclick="rf202BackupToggle()">Backup anzeigen</button>
+  </div>
 
   <label for="sortierungInput">Sortierung</label>
   <select id="sortierungInput">
@@ -277,8 +281,20 @@ Fülle auf den Teig geben.
 
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
+
+<section id="rf202BackupPanel" class="box versteckt">
+  <h2>Backup</h2>
+  <p>Hier findest du deine Backup- und Cloud-Funktionen.</p>
+  <div id="rf202BackupButtons" class="button-gruppe">
+    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
+    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
+    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
+    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
+  </div>
+</section>
+
 <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v2.04 Cloud</footer>
+  <footer>Rezeptfinder v2.02 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js?v=199"></script>
