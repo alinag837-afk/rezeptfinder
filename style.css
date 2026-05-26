@@ -820,3 +820,26 @@ body.rf196-startseite #datenpruefungBereich {
 #rf197BackupPanel button {
   margin: 4px;
 }
+
+
+/* VERSION 2.00 Backup Button sichtbar */
+#rf200BackupWrapper{
+  margin-top:16px;
+}
+
+#rf200BackupToggle{
+  width:100%;
+}
+
+#rf200BackupPanel{
+  display:none;
+  margin-top:12px;
+  padding:14px;
+  border:1px solid #dbe3ef;
+  border-radius:16px;
+  background:#f8fafc;
+}
+
+#rf200BackupPanel.open{
+  display:block;
+}
