@@ -883,3 +883,38 @@ body.rf196-startseite #datenpruefungBereich {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+
+/* VERSION 2.03 Backup Button bleibt in Startübersicht */
+#rf203BackupToggle {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+#rf203BackupPanel.versteckt {
+  display: none !important;
+}
+
+#rf203BackupPanel {
+  margin-top: 18px;
+}
+
+#rf203BackupButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* gleiche Optik wie Startbuttons erzwingen */
+#rf203BackupToggle.rf203-start-button {
+  background: #2f7df6;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 18px 34px;
+  min-width: 260px;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
