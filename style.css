@@ -765,3 +765,21 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 #textImportBereich.rf194-closed {
   display: none !important;
 }
+
+
+/* VERSION 1.95 Startseite aufgeräumt */
+body.startseite-clean #ergebnisse {
+  display: none !important;
+}
+
+body.startseite-clean #rezeptSucheBereich,
+body.startseite-clean #formularBereich,
+body.startseite-clean #textImportBereich,
+body.startseite-clean #einkaufBereich,
+body.startseite-clean #datenpruefungBereich {
+  display: none !important;
+}
+
+body.startseite-clean .start-hinweis {
+  display: block;
+}
