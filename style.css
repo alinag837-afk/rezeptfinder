@@ -1040,3 +1040,20 @@ body.rf205-start #rf205BackupPanel {
 #rf197BackupPanel {
   display: none !important;
 }
+
+
+/* VERSION 2.07 Startseiten-Buttons zuverlässig */
+#rf207AlleRezepte,
+#rf207RezepteSuchen,
+#rf207RezeptHinzufuegen,
+#rf207Einkaufsliste,
+#rf207RezeptAssistent,
+#rf207RezeptePruefen,
+#rf207CloudSpeichern,
+#rf207CloudLaden,
+#rf207CloudBackups,
+#rf207BackupDownload {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}

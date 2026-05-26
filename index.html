@@ -8,8 +8,8 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v2.06 Cloud</title>
-  <link rel="stylesheet" href="style.css?v=206">
+  <title>Rezeptfinder v2.07 Cloud</title>
+  <link rel="stylesheet" href="style.css?v=207">
 </head>
 <body>
 <main class="container">
@@ -27,55 +27,33 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v2.06 Cloud</p>
+    <p class="version">Rezeptfinder v2.07 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
 <div class="button-gruppe">
-
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
-  </div>
+    <button id="rf207CloudSpeichern" type="button">Jetzt in Cloud speichern</button>
+    <button id="rf207CloudLaden" type="button">Aus Cloud laden</button>
+    <button id="rf207CloudBackups" type="button">Cloud-Backups anzeigen</button>
+    <button id="rf207BackupDownload" type="button">Manuelles Backup herunterladen</button>
+</div>
         <div id="offlineStatusText" class="offline-status">
-
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
-  </div>
+</div>
         <div id="cloudBackupPanel" class="cloud-backup-panel">
-
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
-  </div>
-
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
-  </div>
+</div>
+</div>
     <div id="rezeptDesTagesBox" class="rezept-des-tages">
-
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
-  </div>
+</div>
   </section>
 
   <section class="box start-buttons">
     <h2>Was möchtest du machen?</h2>
-    <button onclick="rezeptSucheToggle()">Rezepte suchen</button>
-    <button onclick="rezeptHinzufuegenToggle()">Rezept hinzufügen</button>
-    <button onclick="alleRezepteToggle()">Alle Rezepte anzeigen</button>
-    <button onclick="hauptbereichToggle('einkaufBereich')">Einkaufsliste</button>
-    
-    <button onclick="rezeptAssistentToggle()">Rezept-Assistent</button>
-    <button onclick="hauptbereichToggle('datenpruefungBereich', false, false, true)">Rezepte prüfen</button>
+    <button id="rf207RezepteSuchen" type="button">Rezepte suchen</button>
+    <button id="rf207RezeptHinzufuegen" type="button">Rezept hinzufügen</button>
+<button id="rf207AlleRezepte" type="button">Alle Rezepte anzeigen</button>
+    <button id="rf207Einkaufsliste" type="button">Einkaufsliste</button>
+    <button id="rf207RezeptAssistent" type="button">Rezept-Assistent</button>
+    <button id="rf207RezeptePruefen" type="button">Rezepte prüfen</button>
 </section>
 
   
@@ -110,12 +88,7 @@
     <button class="kategorie-kachel" data-kategorie="Pralinen" onclick="kategorieKachelUmschalten(this)">Pralinen</button>
     <button class="kategorie-kachel" data-kategorie="Sonstiges" onclick="kategorieKachelUmschalten(this)">Sonstiges</button>
     <button class="kategorie-kachel" data-kategorie="Airfryer" onclick="kategorieKachelUmschalten(this)">Airfryer</button>
-
-    <button type="button" onclick="cloudSpeichernAlle()">Jetzt in Cloud speichern</button>
-    <button type="button" onclick="cloudLaden()">Aus Cloud laden</button>
-    <button type="button" onclick="cloudBackupsAnzeigen()">Cloud-Backups anzeigen</button>
-    <button type="button" onclick="backupHerunterladen()">Manuelles Backup herunterladen</button>
-  </div>
+</div>
 
   <label for="sortierungInput">Sortierung</label>
   <select id="sortierungInput">
@@ -304,10 +277,10 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
 <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v2.06 Cloud</footer>
+  <footer>Rezeptfinder v2.07 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=206"></script>
+  <script src="script.js?v=207"></script>
 
 <select id="bewertungFilter" class="versteckt"><option value=""></option></select>
 <div id="schnellfilterInhalt" class="versteckt"></div>
