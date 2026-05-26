@@ -1035,3 +1035,37 @@ body.rf205-start #rf205BackupPanel {
   margin: 8px !important;
   line-height: 1.2 !important;
 }
+
+
+/* VERSION 2.07 Backup-Button exakt wie 'Rezepte prüfen' */
+#rf205BackupToggle {
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
+  height: 74px !important;
+
+  padding: 0 24px !important;
+  margin: 10px 12px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+
+  flex: 0 0 auto !important;
+}
+
+@media (max-width: 900px) {
+  #rf205BackupToggle {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
