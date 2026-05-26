@@ -1316,3 +1316,166 @@ button[id^="rf204"] {
     max-width: none !important;
   }
 }
+
+
+/* =====================================================
+   VERSION 2.14 Oberfläche wie Zielbild
+   ===================================================== */
+
+main.container {
+  max-width: 1180px;
+}
+
+#startBereich,
+.startbereich,
+section:has(#backupStartButton),
+main > section.box:first-of-type {
+  text-align: center;
+}
+
+/* Hauptaktionsbereich */
+.button-gruppe,
+.start-buttons,
+.aktionen-grid {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 22px !important;
+}
+
+/* Alle Hauptbuttons im Bereich "Was möchtest du machen?" */
+main > section.box:first-of-type > .button-gruppe > button,
+main > section.box:first-of-type button,
+#backupStartButton {
+  width: 270px !important;
+  min-width: 270px !important;
+  max-width: 270px !important;
+  height: 74px !important;
+  min-height: 74px !important;
+  max-height: 74px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  margin: 0 !important;
+  padding: 0 20px !important;
+  box-sizing: border-box !important;
+
+  border: none !important;
+  border-radius: 12px !important;
+  background: #2f7df6 !important;
+  color: white !important;
+
+  font-family: inherit !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+#backupStartButton {
+  order: 7;
+}
+
+/* Backup-Bereich wie eigene saubere Karte */
+#backupStartPanel {
+  margin-top: 26px !important;
+  padding: 30px 24px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 18px !important;
+  background: #f8fbff !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04) !important;
+  text-align: center !important;
+}
+
+#backupStartPanel.versteckt {
+  display: none !important;
+}
+
+#backupStartPanel h2 {
+  margin: 0 0 8px 0 !important;
+  font-size: 1.8rem !important;
+  text-align: center !important;
+}
+
+#backupStartPanel p {
+  margin: 0 0 24px 0 !important;
+  color: #222 !important;
+  text-align: center !important;
+}
+
+#backupCleanGrid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  margin-top: 20px !important;
+}
+
+#backupCleanGrid button {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 70px !important;
+  margin: 0 !important;
+  padding: 0 18px !important;
+  border-radius: 12px !important;
+  background: #2f7df6 !important;
+  color: #fff !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#backupCollapseButton {
+  margin-top: 24px !important;
+  width: 100% !important;
+  height: 56px !important;
+  background: #ffffff !important;
+  color: #2f7df6 !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Alte Backupreste sicher ausblenden */
+#rf197BackupPanel,
+#rf200BackupPanel,
+#rf201BackupPanel,
+#rf202BackupPanel,
+#rf203BackupPanel,
+#rf204BackupPanel,
+#rf205BackupPanel,
+#rf197BackupToggle,
+#rf200BackupToggle,
+#rf201BackupToggle,
+#rf202BackupToggle,
+#rf203BackupToggle,
+#rf204BackupToggle,
+#rf205BackupToggle {
+  display: none !important;
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  main > section.box:first-of-type > .button-gruppe > button,
+  main > section.box:first-of-type button,
+  #backupStartButton {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  #backupCleanGrid {
+    grid-template-columns: 1fr !important;
+  }
+}
