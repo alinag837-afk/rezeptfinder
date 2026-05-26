@@ -25475,3 +25475,77 @@ window.addEventListener("load", function () {
     setTimeout(bindMainButtons, 1500);
   });
 })();
+
+
+// =====================================================
+// VERSION 2.08 Backup Bereich bereinigen
+// =====================================================
+
+(function () {
+
+  function rf208CleanupBackupButtons() {
+
+    const panel = document.getElementById("rf205BackupPanel");
+    const box = document.getElementById("rf205BackupButtons");
+
+    if (!panel || !box) return;
+
+    // Nur die gewünschten Buttons behalten
+    const wanted = [
+      "Jetzt in Cloud speichern",
+      "Aus Cloud laden",
+      "Cloud-Backups anzeigen",
+      "Manuelles Backup herunterladen"
+    ];
+
+    // Vorhandene Buttons säubern
+    const existing = Array.from(box.querySelectorAll("button"));
+
+    existing.forEach(btn => {
+      const text = (btn.textContent || "").trim();
+
+      if (!wanted.includes(text)) {
+        btn.remove();
+      }
+    });
+
+    // Doppelte entfernen
+    const seen = new Set();
+
+    Array.from(box.querySelectorAll("button")).forEach(btn => {
+      const text = (btn.textContent || "").trim();
+
+      if (seen.has(text)) {
+        btn.remove();
+      } else {
+        seen.add(text);
+      }
+    });
+
+    // Überall im Dokument alte doppelte Backupbuttons entfernen
+    Array.from(document.querySelectorAll("button")).forEach(btn => {
+
+      if (btn.closest("#rf205BackupPanel")) return;
+      if (btn.id === "rf205BackupToggle") return;
+
+      const text = (btn.textContent || "").trim();
+
+      if (
+        text === "Backup anzeigen" ||
+        text === "Cloud-Backups anzeigen" ||
+        text === "Jetzt in Cloud speichern" ||
+        text === "Aus Cloud laden" ||
+        text === "Manuelles Backup herunterladen"
+      ) {
+        btn.remove();
+      }
+    });
+  }
+
+  window.addEventListener("load", function () {
+    setTimeout(rf208CleanupBackupButtons, 300);
+    setTimeout(rf208CleanupBackupButtons, 1000);
+    setTimeout(rf208CleanupBackupButtons, 2500);
+  });
+
+})();

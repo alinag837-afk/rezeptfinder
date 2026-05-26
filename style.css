@@ -1069,3 +1069,40 @@ body.rf205-start #rf205BackupPanel {
     max-width: none !important;
   }
 }
+
+
+/* VERSION 2.08 Backup-Bereich aufgeräumt */
+#rf205BackupPanel {
+  max-width: 1000px;
+}
+
+#rf205BackupPanel h2,
+#rf205BackupPanel p {
+  text-align: left;
+}
+
+#rf205BackupButtons {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+#rf205BackupButtons button {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 70px !important;
+  margin: 0 !important;
+  padding: 14px 18px !important;
+  font-size: 1rem !important;
+}
+
+/* Verstecke alte doppelte Backup-Buttons */
+button[id^="rf200"],
+button[id^="rf201"],
+button[id^="rf202"],
+button[id^="rf203"],
+button[id^="rf204"] {
+  display: none !important;
+}
