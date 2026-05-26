@@ -1173,3 +1173,29 @@ button[id^="rf204"] {
     max-width: none !important;
   }
 }
+
+
+/* VERSION 2.11 Backup als normaler Hauptbereich */
+#backupStartPanel.versteckt {
+  display: none !important;
+}
+
+#backupStartPanel {
+  margin-top: 18px;
+}
+
+#backupStartPanel .backup-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+#backupStartPanel .backup-grid button {
+  width: 100% !important;
+  height: 70px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 14px 18px !important;
+  font-size: 1rem !important;
+}

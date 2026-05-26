@@ -25720,3 +25720,138 @@ window.addEventListener("load", function () {
   setTimeout(backupFinalButtonSichern, 1500);
   setTimeout(backupFinalButtonSichern, 3000);
 });
+
+
+
+// =====================================================
+// VERSION 2.11 Backup als eigener Hauptbereich
+// Funktioniert wie Rezept-Assistent / Rezepte prüfen.
+// =====================================================
+
+(function () {
+  function rf211Hide(el) {
+    if (!el) return;
+    el.classList.add("versteckt");
+    el.style.display = "none";
+    el.hidden = true;
+  }
+
+  function rf211Show(el) {
+    if (!el) return;
+    el.classList.remove("versteckt");
+    el.style.display = "";
+    el.hidden = false;
+  }
+
+  function rf211CloseMainAreas() {
+    [
+      "formularBereich",
+      "rezeptSucheBereich",
+      "textImportBereich",
+      "einkaufBereich",
+      "datenpruefungBereich",
+      "rf205BackupPanel",
+      "rf203BackupPanel",
+      "rf202BackupPanel",
+      "rf201BackupPanel",
+      "rf200BackupPanel"
+    ].forEach(id => rf211Hide(document.getElementById(id)));
+
+    const ergebnisse = document.getElementById("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      rf211Hide(ergebnisse);
+    }
+  }
+
+  function rf211CleanupBackupPanel() {
+    const panel = document.getElementById("backupStartPanel");
+    if (!panel) return;
+
+    const wanted = [
+      "Aus Cloud laden",
+      "Jetzt in Cloud speichern",
+      "Cloud-Backups anzeigen"
+    ];
+
+    // Entfernt alle unerwünschten Buttons im Backupbereich.
+    Array.from(panel.querySelectorAll("button")).forEach(btn => {
+      const text = (btn.textContent || "").trim();
+      if (!wanted.includes(text)) btn.remove();
+    });
+
+    // Doppelte entfernen.
+    const seen = new Set();
+    Array.from(panel.querySelectorAll("button")).forEach(btn => {
+      const text = (btn.textContent || "").trim();
+      if (seen.has(text)) btn.remove();
+      else seen.add(text);
+    });
+  }
+
+  function backupStartToggle() {
+    const panel = document.getElementById("backupStartPanel");
+    const button = document.getElementById("backupStartButton");
+
+    if (!panel || !button) return false;
+
+    const closed =
+      panel.classList.contains("versteckt") ||
+      panel.hidden ||
+      panel.style.display === "none";
+
+    if (closed) {
+      rf211CloseMainAreas();
+      document.body.classList.remove("rf205-start");
+      document.body.classList.remove("rf196-startseite");
+      document.body.classList.remove("startseite-clean");
+
+      rf211Show(panel);
+      button.textContent = "Backup einklappen";
+      rf211CleanupBackupPanel();
+
+      try {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch(e) {}
+    } else {
+      rf211Hide(panel);
+      button.textContent = "Backup anzeigen";
+    }
+
+    return false;
+  }
+
+  function backupCloudBackupsAnzeigen() {
+    const names = ["cloudBackupsAnzeigen", "cloudBackupAnzeigen", "backupsAnzeigen"];
+    for (const name of names) {
+      if (typeof window[name] === "function") return window[name]();
+      try { if (typeof globalThis[name] === "function") return globalThis[name](); } catch(e) {}
+    }
+
+    alert("Cloud-Backups konnten nicht geöffnet werden.");
+    return false;
+  }
+
+  function rf211EnsureBackupButton() {
+    const button = document.getElementById("backupStartButton");
+    if (!button) return;
+
+    button.onclick = backupStartToggle;
+    button.hidden = false;
+    button.style.display = "inline-flex";
+  }
+
+  window.backupStartToggle = backupStartToggle;
+  window.backupCloudBackupsAnzeigen = backupCloudBackupsAnzeigen;
+  window.rf211CleanupBackupPanel = rf211CleanupBackupPanel;
+
+  window.addEventListener("load", function () {
+    rf211EnsureBackupButton();
+    rf211CleanupBackupPanel();
+
+    setTimeout(rf211EnsureBackupButton, 500);
+    setTimeout(rf211CleanupBackupPanel, 500);
+    setTimeout(rf211EnsureBackupButton, 1500);
+    setTimeout(rf211CleanupBackupPanel, 1500);
+  });
+})();
