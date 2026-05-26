@@ -1661,3 +1661,186 @@ main.container > section.box:first-of-type .button-gruppe > button:nth-child(7),
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* =====================================================
+   VERSION 2.16 EXAKTER STARTBEREICH
+   ===================================================== */
+
+#startBereich.start-box {
+  max-width: 1180px !important;
+  margin: 0 auto 24px auto !important;
+  padding: 52px 34px !important;
+  text-align: center !important;
+  border-radius: 18px !important;
+  background: #f8fbff !important;
+  border: 1px solid #dbe3ef !important;
+}
+
+#startBereich.start-box h2 {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+  margin: 0 0 48px 0 !important;
+  padding: 0 !important;
+  font-size: 2.4rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+}
+
+#startButtonGrid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 270px) !important;
+  grid-auto-rows: 74px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 34px 24px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+}
+
+#startButtonGrid button {
+  width: 270px !important;
+  min-width: 270px !important;
+  max-width: 270px !important;
+  height: 74px !important;
+  min-height: 74px !important;
+  max-height: 74px !important;
+  margin: 0 !important;
+  padding: 0 18px !important;
+  transform: none !important;
+  grid-column: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #2f7df6 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+  font-family: inherit !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+/* Zweite Reihe exakt mittig: 3 Buttons unter 4 Buttons */
+#startButtonGrid button:nth-child(5) {
+  grid-column: 1 !important;
+  margin-left: 147px !important;
+}
+
+#startButtonGrid button:nth-child(6) {
+  grid-column: 2 !important;
+  margin-left: 147px !important;
+}
+
+#startButtonGrid button:nth-child(7) {
+  grid-column: 3 !important;
+  margin-left: 147px !important;
+}
+
+/* Backup-Panel sauber darunter */
+#backupStartPanel.backup-panel-clean {
+  max-width: 1180px !important;
+  margin: 26px auto 0 auto !important;
+  padding: 34px 28px !important;
+  border: 1px solid #dbe3ef !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06) !important;
+  text-align: center !important;
+}
+
+#backupStartPanel.versteckt {
+  display: none !important;
+}
+
+#backupStartPanel h2 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  margin: 0 0 8px 0 !important;
+  font-size: 2rem !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+}
+
+#backupStartPanel p {
+  margin: 0 0 28px 0 !important;
+  text-align: center !important;
+}
+
+#backupCleanGrid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 18px !important;
+  width: 100% !important;
+}
+
+#backupCleanGrid button {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 72px !important;
+  margin: 0 !important;
+  padding: 0 18px !important;
+  border-radius: 12px !important;
+  background: #2f7df6 !important;
+  color: #fff !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Alte Startbutton-Regeln neutralisieren */
+main.container > section.box:first-of-type .button-gruppe > button:nth-child(5),
+main.container > section.box:first-of-type .button-gruppe > button:nth-child(6),
+main.container > section.box:first-of-type .button-gruppe > button:nth-child(7) {
+  transform: none !important;
+  margin-left: 0 !important;
+}
+
+/* Alte Backupreste ausblenden */
+#rf197BackupPanel,
+#rf200BackupPanel,
+#rf201BackupPanel,
+#rf202BackupPanel,
+#rf203BackupPanel,
+#rf204BackupPanel,
+#rf205BackupPanel,
+#rf197BackupToggle,
+#rf200BackupToggle,
+#rf201BackupToggle,
+#rf202BackupToggle,
+#rf203BackupToggle,
+#rf204BackupToggle,
+#rf205BackupToggle {
+  display: none !important;
+}
+
+@media (max-width: 1180px) {
+  #startButtonGrid {
+    grid-template-columns: repeat(2, minmax(240px, 1fr)) !important;
+  }
+
+  #startButtonGrid button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+    grid-column: auto !important;
+  }
+
+  #backupCleanGrid {
+    grid-template-columns: 1fr !important;
+  }
+}

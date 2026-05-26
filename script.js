@@ -26390,3 +26390,94 @@ window.addEventListener("load", function () {
     setTimeout(ensureBackupButton, 1200);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.16 Backup sauber im festen Startgrid
+// =====================================================
+
+(function () {
+  function hide(el) {
+    if (!el) return;
+    el.classList.add("versteckt");
+    el.style.display = "none";
+    el.hidden = true;
+  }
+
+  function show(el) {
+    if (!el) return;
+    el.classList.remove("versteckt");
+    el.style.display = "";
+    el.hidden = false;
+  }
+
+  function callFirst(names) {
+    for (const name of names) {
+      try {
+        if (typeof window[name] === "function") return window[name]();
+        if (typeof globalThis[name] === "function") return globalThis[name]();
+      } catch (e) {
+        alert("Fehler: " + (e.message || "unbekannt"));
+        return false;
+      }
+    }
+    alert("Diese Funktion wurde nicht gefunden.");
+    return false;
+  }
+
+  function closeOtherAreas() {
+    [
+      "formularBereich",
+      "rezeptSucheBereich",
+      "textImportBereich",
+      "einkaufBereich",
+      "datenpruefungBereich"
+    ].forEach(id => hide(document.getElementById(id)));
+
+    const ergebnisse = document.getElementById("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      hide(ergebnisse);
+    }
+  }
+
+  function bindBackupPanelButtons() {
+    const load = document.getElementById("backupLoadCloud");
+    const save = document.getElementById("backupSaveCloud");
+    const backups = document.getElementById("backupShowCloudBackups");
+
+    if (load) load.onclick = () => callFirst(["cloudLaden", "cloudHerunterladen", "ausCloudLaden"]);
+    if (save) save.onclick = () => callFirst(["cloudSpeichernAlle", "cloudSpeichernAlleDirekt", "cloudSpeichernAlleDirekt1294"]);
+    if (backups) backups.onclick = () => callFirst(["cloudBackupsAnzeigen", "cloudBackupAnzeigen", "backupsAnzeigen"]);
+  }
+
+  function backupStartToggle() {
+    const panel = document.getElementById("backupStartPanel");
+    const button = document.getElementById("backupStartButton");
+    if (!panel || !button) return false;
+
+    const closed = panel.classList.contains("versteckt") || panel.hidden || panel.style.display === "none";
+
+    if (closed) {
+      closeOtherAreas();
+      show(panel);
+      button.textContent = "Backup einklappen";
+      bindBackupPanelButtons();
+      try { panel.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    } else {
+      hide(panel);
+      button.textContent = "Backup anzeigen";
+    }
+
+    return false;
+  }
+
+  window.backupStartToggle = backupStartToggle;
+
+  window.addEventListener("load", function () {
+    const button = document.getElementById("backupStartButton");
+    if (button) button.onclick = backupStartToggle;
+    bindBackupPanelButtons();
+  });
+})();
