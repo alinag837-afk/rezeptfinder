@@ -783,3 +783,14 @@ body.startseite-clean #datenpruefungBereich {
 body.startseite-clean .start-hinweis {
   display: block;
 }
+
+
+/* VERSION 1.96 Startseite wirklich ohne Rezeptliste */
+body.rf196-startseite #ergebnisse,
+body.rf196-startseite #rezeptSucheBereich,
+body.rf196-startseite #formularBereich,
+body.rf196-startseite #textImportBereich,
+body.rf196-startseite #einkaufBereich,
+body.rf196-startseite #datenpruefungBereich {
+  display: none !important;
+}
