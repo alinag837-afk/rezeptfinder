@@ -1116,3 +1116,60 @@ button[id^="rf204"] {
   align-items: center !important;
   justify-content: center !important;
 }
+
+
+/* VERSION 2.10 Backup-Button final */
+#backupStartButton {
+  width: 360px !important;
+  min-width: 360px !important;
+  max-width: 360px !important;
+  height: 74px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #2f7df6 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 0 24px !important;
+  margin: 10px 12px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  flex: 0 0 auto !important;
+}
+
+#backupStartPanel.versteckt {
+  display: none !important;
+}
+
+#backupStartPanel {
+  margin-top: 18px;
+}
+
+#backupStartPanel .backup-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+#backupStartPanel .backup-grid button {
+  width: 100% !important;
+  height: 70px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 14px 18px !important;
+  font-size: 1rem !important;
+}
+
+@media (max-width: 900px) {
+  #backupStartButton {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}

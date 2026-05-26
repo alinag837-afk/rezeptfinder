@@ -25609,3 +25609,114 @@ window.addEventListener("load", function () {
   });
 
 })();
+
+
+
+// =====================================================
+// VERSION 2.10 Backup Button FINAL
+// Der Button wird direkt in der Startübersicht gehalten.
+// Alte Aufräum-Skripte dürfen ihn nicht mehr entfernen.
+// =====================================================
+
+function backupStartToggle() {
+  const panel = document.getElementById("backupStartPanel");
+  const button = document.getElementById("backupStartButton");
+  if (!panel || !button) return false;
+
+  const closed = panel.classList.contains("versteckt") || panel.hidden || panel.style.display === "none";
+
+  if (closed) {
+    panel.classList.remove("versteckt");
+    panel.hidden = false;
+    panel.style.display = "";
+    button.textContent = "Backup einklappen";
+  } else {
+    panel.classList.add("versteckt");
+    panel.hidden = true;
+    panel.style.display = "none";
+    button.textContent = "Backup anzeigen";
+  }
+
+  return false;
+}
+
+function backupCloudBackupsAnzeigen() {
+  const names = ["cloudBackupsAnzeigen", "cloudBackupAnzeigen", "backupsAnzeigen"];
+  for (const name of names) {
+    if (typeof window[name] === "function") return window[name]();
+    try { if (typeof globalThis[name] === "function") return globalThis[name](); } catch(e) {}
+  }
+  alert("Cloud-Backups konnten nicht geöffnet werden.");
+  return false;
+}
+
+function backupManuellHerunterladen() {
+  const names = ["backupHerunterladen", "backupExportieren", "datenExportieren", "manuellesBackupHerunterladen"];
+  for (const name of names) {
+    if (typeof window[name] === "function") return window[name]();
+    try { if (typeof globalThis[name] === "function") return globalThis[name](); } catch(e) {}
+  }
+  alert("Backup-Download konnte nicht gestartet werden.");
+  return false;
+}
+
+function backupFinalButtonSichern() {
+  let button = document.getElementById("backupStartButton");
+
+  const startButtons = Array.from(document.querySelectorAll("button")).filter(btn => {
+    const t = (btn.textContent || "").trim().toLowerCase();
+    return (
+      t === "rezepte suchen" ||
+      t === "rezept hinzufügen" ||
+      t === "alle rezepte anzeigen" ||
+      t === "einkaufsliste" ||
+      t === "rezept-assistent" ||
+      t === "rezepte prüfen"
+    );
+  });
+
+  const group = startButtons.length ? startButtons[0].parentElement : null;
+  if (!group) return;
+
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "backupStartButton";
+    button.className = "start-button";
+    button.type = "button";
+    button.textContent = "Backup anzeigen";
+    button.onclick = backupStartToggle;
+  }
+
+  if (button.parentElement !== group) {
+    group.appendChild(button);
+  }
+
+  button.hidden = false;
+  button.style.display = "inline-flex";
+  button.onclick = backupStartToggle;
+}
+
+// Falls alte Cleanup-Skripte remove() auf den Backup-Button anwenden wollen: blockieren.
+(function(){
+  const oldRemove = Element.prototype.remove;
+  Element.prototype.remove = function() {
+    if (this && this.id === "backupStartButton") {
+      backupFinalButtonSichern();
+      return;
+    }
+    return oldRemove.call(this);
+  };
+})();
+
+window.backupStartToggle = backupStartToggle;
+window.backupFinalButtonSichern = backupFinalButtonSichern;
+window.backupCloudBackupsAnzeigen = backupCloudBackupsAnzeigen;
+window.backupManuellHerunterladen = backupManuellHerunterladen;
+
+window.addEventListener("load", function () {
+  backupFinalButtonSichern();
+  setTimeout(backupFinalButtonSichern, 200);
+  setTimeout(backupFinalButtonSichern, 700);
+  setTimeout(backupFinalButtonSichern, 1500);
+  setTimeout(backupFinalButtonSichern, 3000);
+});
