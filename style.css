@@ -1057,3 +1057,45 @@ body.rf205-start #rf205BackupPanel {
   align-items: center;
   justify-content: center;
 }
+
+
+/* VERSION 2.10 Rezepte prüfen wieder als Kartenansicht */
+.rf210-pruef-zusammenfassung {
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.rf210-pruef-karte {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 16px;
+  margin: 14px 0;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+}
+
+.rf210-pruef-karte h3 {
+  margin-top: 0;
+}
+
+.rf210-pruef-karte ul {
+  padding-left: 20px;
+}
+
+.rf210-pruef-karte li {
+  margin: 8px 0;
+}
+
+.rf210-pruef-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.rf210-pruef-aktionen button,
+.rf210-problem-button {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+}

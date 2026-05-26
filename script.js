@@ -26285,3 +26285,354 @@ window.addEventListener("load", function () {
     setTimeout(rf209Bind, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.10 Rezepte prüfen wieder wie vorher
+// Kartenansicht mit Problemen, ignorieren, bearbeiten,
+// und doppelte Zutaten zusammenführen.
+// =====================================================
+
+(function () {
+  function rf210El(id) {
+    return document.getElementById(id);
+  }
+
+  function rf210Esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function rf210LoadRezepte() {
+    try {
+      const raw = localStorage.getItem("rezepte");
+      if (raw) {
+        window.rezepte = JSON.parse(raw) || [];
+        try { rezepte = window.rezepte; } catch(e) {}
+      }
+    } catch(e) {}
+
+    try {
+      if ((!window.rezepte || !Array.isArray(window.rezepte)) && Array.isArray(rezepte)) {
+        window.rezepte = rezepte;
+      }
+    } catch(e) {}
+
+    if (!Array.isArray(window.rezepte)) window.rezepte = [];
+    return window.rezepte;
+  }
+
+  function rf210DatenLaden(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch(e) {
+      return fallback;
+    }
+  }
+
+  function rf210DatenSpeichern(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function rf210ZutatenAusRezept(r) {
+    if (!r) return [];
+
+    if (typeof zutatenAusRezept === "function") {
+      try {
+        const z = zutatenAusRezept(r);
+        if (Array.isArray(z)) return z;
+      } catch(e) {}
+    }
+
+    if (Array.isArray(r.zutaten) && r.zutaten.length) return r.zutaten;
+
+    if (Array.isArray(r.zutatenGruppen)) {
+      return r.zutatenGruppen.flatMap(g => Array.isArray(g.zutaten) ? g.zutaten : []);
+    }
+
+    return [];
+  }
+
+  function rf210Norm(value) {
+    return String(value || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+
+  function rf210ZutatName(z) {
+    if (!z) return "";
+    if (typeof z === "string") {
+      return z.replace(/^\d+(?:[,.]\d+)?\s*\S*\s+/, "").trim();
+    }
+    return String(z.name || z.zutat || z.text || "").trim();
+  }
+
+  function rf210ZutatMenge(z) {
+    if (!z) return "";
+    if (typeof z === "string") {
+      const m = z.match(/^(\d+(?:[,.]\d+)?)/);
+      return m ? m[1] : "";
+    }
+    return String(z.menge || "").trim();
+  }
+
+  function rf210ZutatEinheit(z) {
+    if (!z) return "";
+    if (typeof z === "string") {
+      const m = z.match(/^\d+(?:[,.]\d+)?\s*(\S+)/);
+      return m ? m[1] : "";
+    }
+    return String(z.einheit || "").trim();
+  }
+
+  function rf210DoppelteZutaten(zutaten) {
+    const seen = new Map();
+    const doppelt = new Set();
+
+    zutaten.forEach(z => {
+      const name = rf210Norm(rf210ZutatName(z));
+      const einheit = rf210Norm(rf210ZutatEinheit(z));
+      if (!name) return;
+      const key = name + "|" + einheit;
+      if (seen.has(key)) doppelt.add(rf210ZutatName(z));
+      else seen.set(key, true);
+    });
+
+    return [...doppelt];
+  }
+
+  function rf210ProblemeFuerRezept(r, index, ignorierte) {
+    const probleme = [];
+    const name = r && r.name ? r.name : "Rezept " + (index + 1);
+
+    if (!r || !r.name || !String(r.name).trim()) probleme.push("Name fehlt");
+    if (!r || !r.kategorie || r.kategorie === "Nicht zugeordnet") probleme.push("Kategorie nicht zugeordnet");
+    if (!r || !r.portionen || String(r.portionen).trim() === "") probleme.push("Grundportionen fehlen");
+    if (!r || !r.zubereitung || !String(r.zubereitung).trim()) probleme.push("Zubereitung fehlt");
+    if (!r || !r.schwierigkeit || !String(r.schwierigkeit).trim()) probleme.push("Schwierigkeit fehlt");
+    if (!r || !Array.isArray(r.tags) || !r.tags.length) probleme.push("Tags fehlen");
+    if (!r || !r.bewertung) probleme.push("Bewertung fehlt");
+
+    const zutaten = rf210ZutatenAusRezept(r);
+    if (!zutaten.length) probleme.push("Zutaten fehlen");
+
+    zutaten.forEach(z => {
+      const zName = rf210ZutatName(z) || "Zutat";
+      if (!rf210ZutatMenge(z)) probleme.push("Menge fehlt bei " + zName);
+      if (!rf210ZutatEinheit(z)) probleme.push("Einheit fehlt bei " + zName);
+    });
+
+    const doppelte = rf210DoppelteZutaten(zutaten);
+    if (doppelte.length) probleme.push("Doppelte Zutaten: " + doppelte.join(", "));
+
+    const id = r && r.id ? r.id : "index-" + index;
+    const ign = ignorierte[id] || [];
+    const gefiltert = probleme.filter(p => !ign.includes(p));
+
+    return {
+      index,
+      id,
+      name,
+      probleme: gefiltert,
+      hatDoppelteZutaten: doppelte.length > 0
+    };
+  }
+
+  function rf210DatenqualitaetPruefen() {
+    const rezepteListe = rf210LoadRezepte();
+    const ignorierte = rf210DatenLaden("ignorierteProbleme", {});
+
+    const probleme = rezepteListe
+      .map((r, index) => rf210ProblemeFuerRezept(r, index, ignorierte))
+      .filter(e => e.probleme.length);
+
+    rf210ZeigeDatenqualitaet(probleme, rezepteListe.length);
+    return probleme;
+  }
+
+  function rf210ZeigeDatenqualitaet(probleme, gesamt) {
+    const container = rf210El("datenpruefungInhalt");
+    if (!container) return;
+
+    if (!gesamt) {
+      container.innerHTML = "<p>Es sind noch keine Rezepte gespeichert.</p>";
+      return;
+    }
+
+    if (!probleme || !probleme.length) {
+      container.innerHTML = `
+        <p class="rf210-pruef-zusammenfassung">Alles sieht gut aus.</p>
+        <p>Geprüfte Rezepte: ${gesamt}</p>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <p class="rf210-pruef-zusammenfassung">
+        ${probleme.length} Rezept(e) mit möglichen Problemen gefunden.
+      </p>
+    `;
+
+    probleme.forEach(e => {
+      const div = document.createElement("div");
+      div.className = "rf210-pruef-karte";
+      div.innerHTML = `
+        <h3>${rf210Esc(e.name || "Unbenanntes Rezept")}</h3>
+        <ul>
+          ${(e.probleme || []).map(p => `
+            <li>
+              ${rf210Esc(p)}
+              <button class="rf210-problem-button" type="button"
+                onclick='rf210ProblemIgnorieren(${JSON.stringify(e.id)}, ${JSON.stringify(p)})'>
+                ignorieren
+              </button>
+            </li>
+          `).join("")}
+        </ul>
+        <div class="rf210-pruef-aktionen">
+          <button type="button" onclick="rf210AlleProblemeIgnorieren(${JSON.stringify(e.id)})">
+            Alle Punkte ignorieren
+          </button>
+          <button type="button" onclick="rf210RezeptAusPruefungBearbeiten(${e.index})">
+            Rezept bearbeiten
+          </button>
+          ${e.hatDoppelteZutaten ? `
+            <button type="button" onclick="rf210DoppelteZutatenZusammenfuehren(${e.index})">
+              Doppelte Zutaten zusammenführen
+            </button>
+          ` : ""}
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  function rf210Oeffnen() {
+    document.body.classList.remove("rf205-start", "rf196-startseite", "startseite-clean");
+
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich"].forEach(id => {
+      const el = rf210El(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    const ergebnisse = rf210El("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      ergebnisse.hidden = true;
+      ergebnisse.style.display = "none";
+    }
+
+    const bereich = rf210El("datenpruefungBereich");
+    if (bereich) {
+      bereich.hidden = false;
+      bereich.style.display = "";
+      bereich.classList.remove("versteckt");
+    }
+
+    rf210DatenqualitaetPruefen();
+
+    try { bereich && bereich.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    return false;
+  }
+
+  window.rf210DatenqualitaetPruefen = rf210DatenqualitaetPruefen;
+  window.rf210ZeigeDatenqualitaet = rf210ZeigeDatenqualitaet;
+  window.datenqualitaetPruefen = rf210DatenqualitaetPruefen;
+
+  window.zeigeDatenqualitaet = function(probleme) {
+    const liste = rf210LoadRezepte();
+    rf210ZeigeDatenqualitaet(probleme || [], liste.length);
+  };
+
+  window.rf210ProblemIgnorieren = function(id, problem) {
+    const ignorierte = rf210DatenLaden("ignorierteProbleme", {});
+    ignorierte[id] = [...new Set([...(ignorierte[id] || []), problem])];
+    rf210DatenSpeichern("ignorierteProbleme", ignorierte);
+    rf210DatenqualitaetPruefen();
+  };
+
+  window.rf210AlleProblemeIgnorieren = function(id) {
+    const ignorierte = rf210DatenLaden("ignorierteProbleme", {});
+    const probleme = [];
+    document.querySelectorAll("#datenpruefungInhalt li").forEach(li => {
+      const text = Array.from(li.childNodes)
+        .filter(n => n.nodeType === Node.TEXT_NODE)
+        .map(n => n.textContent.trim())
+        .join(" ")
+        .trim();
+      if (text) probleme.push(text);
+    });
+    ignorierte[id] = [...new Set([...(ignorierte[id] || []), ...probleme])];
+    rf210DatenSpeichern("ignorierteProbleme", ignorierte);
+    rf210DatenqualitaetPruefen();
+  };
+
+  window.rf210RezeptAusPruefungBearbeiten = function(index) {
+    if (typeof rezeptBearbeiten === "function") return rezeptBearbeiten(index);
+    if (typeof window.rezeptBearbeiten === "function") return window.rezeptBearbeiten(index);
+    alert("Bearbeiten-Funktion wurde nicht gefunden.");
+  };
+
+  window.rf210DoppelteZutatenZusammenfuehren = function(index) {
+    if (typeof doppelteZutatenZusammenfuehren === "function") {
+      const result = doppelteZutatenZusammenfuehren(index);
+      setTimeout(rf210DatenqualitaetPruefen, 100);
+      return result;
+    }
+    if (typeof window.rf183DoppelteZutatenZusammenfuehren === "function") {
+      const result = window.rf183DoppelteZutatenZusammenfuehren(index);
+      setTimeout(rf210DatenqualitaetPruefen, 100);
+      return result;
+    }
+    alert("Funktion zum Zusammenführen wurde nicht gefunden.");
+  };
+
+  function rf210BindButton() {
+    const byId = document.getElementById("rf207RezeptePruefen");
+    if (byId) {
+      byId.type = "button";
+      byId.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return rf210Oeffnen();
+      };
+    }
+
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      if (text === "rezepte prüfen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf210Oeffnen();
+        };
+      }
+    });
+  }
+
+  window.rf210RezeptePruefenOeffnen = rf210Oeffnen;
+  window.datenPruefen = rf210Oeffnen;
+  window.rezeptePruefen = rf210Oeffnen;
+
+  window.addEventListener("load", function() {
+    rf210BindButton();
+    setTimeout(rf210BindButton, 300);
+    setTimeout(rf210BindButton, 1000);
+    setTimeout(rf210BindButton, 2000);
+  });
+})();
