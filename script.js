@@ -25549,3 +25549,63 @@ window.addEventListener("load", function () {
   });
 
 })();
+
+
+// VERSION 2.09 Backup-Button wiederherstellen
+(function () {
+
+  function rf209FindMainButtonGroup() {
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const target = buttons.find(btn => {
+      const t = (btn.textContent || "").trim().toLowerCase();
+      return t === "rezepte prüfen";
+    });
+
+    return target ? target.parentElement : null;
+  }
+
+  function rf209EnsureBackupButton() {
+
+    const group = rf209FindMainButtonGroup();
+    if (!group) return;
+
+    let btn = document.getElementById("rf205BackupToggle");
+
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "rf205BackupToggle";
+      btn.type = "button";
+      btn.textContent = "Backup anzeigen";
+      group.appendChild(btn);
+    }
+
+    btn.hidden = false;
+    btn.style.display = "inline-flex";
+
+    btn.onclick = function () {
+      const panel = document.getElementById("rf205BackupPanel");
+      if (!panel) return false;
+
+      const hidden = panel.classList.contains("versteckt");
+
+      if (hidden) {
+        panel.classList.remove("versteckt");
+        panel.style.display = "";
+        btn.textContent = "Backup einklappen";
+      } else {
+        panel.classList.add("versteckt");
+        panel.style.display = "none";
+        btn.textContent = "Backup anzeigen";
+      }
+
+      return false;
+    };
+  }
+
+  window.addEventListener("load", function () {
+    rf209EnsureBackupButton();
+    setTimeout(rf209EnsureBackupButton, 500);
+    setTimeout(rf209EnsureBackupButton, 1500);
+  });
+
+})();

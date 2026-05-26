@@ -1106,3 +1106,13 @@ button[id^="rf203"],
 button[id^="rf204"] {
   display: none !important;
 }
+
+
+/* VERSION 2.09 Backup-Button sichtbar */
+#rf205BackupToggle {
+  width: 360px !important;
+  height: 74px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
