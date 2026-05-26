@@ -1021,3 +1021,17 @@ body.rf205-start #rf205BackupPanel {
   width: 100% !important;
   box-sizing: border-box !important;
 }
+
+
+/* VERSION 2.06 Backup-Button gleiche Größe wie andere Buttons */
+#rf205BackupToggle {
+  min-width: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 16px 24px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  margin: 8px !important;
+  line-height: 1.2 !important;
+}
