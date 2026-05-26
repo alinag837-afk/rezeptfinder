@@ -1885,3 +1885,65 @@ button[id^="rf"][id*="Backup"],
 button[id^="backupStartButton"]:not(#backupStartButton) {
   display: none !important;
 }
+
+
+/* VERSION 2.18 Backup wieder normal in Übersicht */
+#startButtonGrid {
+  display: grid !important;
+  grid-template-columns: repeat(4, 270px) !important;
+  justify-content: center !important;
+  gap: 24px !important;
+}
+
+#startButtonGrid button {
+  width: 270px !important;
+  min-width: 270px !important;
+  max-width: 270px !important;
+  height: 74px !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+/* zweite Reihe mittig */
+#startButtonGrid button:nth-child(5),
+#startButtonGrid button:nth-child(6),
+#startButtonGrid button:nth-child(7) {
+  margin-left: 147px !important;
+}
+
+/* Backup exakt wie andere */
+#backupStartButton {
+  width: 270px !important;
+  min-width: 270px !important;
+  max-width: 270px !important;
+  height: 74px !important;
+  margin: 0 !important;
+  padding: 0 18px !important;
+  transform: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Nur EIN Backup-Button */
+#startButtonGrid #backupStartButton {
+  display: inline-flex !important;
+}
+
+button[id^="rf"][id*="Backup"] {
+  display: none !important;
+}
+
+@media (max-width: 1180px) {
+  #startButtonGrid {
+    grid-template-columns: repeat(2, minmax(240px, 1fr)) !important;
+  }
+
+  #startButtonGrid button,
+  #backupStartButton {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+  }
+}
