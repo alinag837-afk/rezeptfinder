@@ -27155,3 +27155,254 @@ window.addEventListener("load", function () {
     }
   }, true);
 })();
+
+
+
+// =====================================================
+// VERSION 2.13 Fix: bearbeitetes Rezept speichern
+// Der sichtbare Speicherbutton wird hart an die funktionierende
+// Formular-Speicherlogik gebunden.
+// =====================================================
+
+(function () {
+  let rf213EditingIndex = null;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function loadRezepte() {
+    try {
+      const raw = localStorage.getItem("rezepte");
+      if (raw) {
+        window.rezepte = JSON.parse(raw) || [];
+        try { rezepte = window.rezepte; } catch(e) {}
+      }
+    } catch(e) {}
+
+    try {
+      if ((!window.rezepte || !Array.isArray(window.rezepte)) && Array.isArray(rezepte)) {
+        window.rezepte = rezepte;
+      }
+    } catch(e) {}
+
+    if (!Array.isArray(window.rezepte)) window.rezepte = [];
+    return window.rezepte;
+  }
+
+  function saveRezepte(list) {
+    window.rezepte = Array.isArray(list) ? list : [];
+    try { rezepte = window.rezepte; } catch(e) {}
+    localStorage.setItem("rezepte", JSON.stringify(window.rezepte));
+  }
+
+  function currentEditIndex() {
+    if (rf213EditingIndex !== null && rf213EditingIndex !== undefined) return rf213EditingIndex;
+    try {
+      if (typeof bearbeitungsIndex === "number") return bearbeitungsIndex;
+    } catch(e) {}
+    if (typeof window.bearbeitungsIndex === "number") return window.bearbeitungsIndex;
+    return null;
+  }
+
+  function readZutaten() {
+    const groups = [];
+    const container = $("zutatenGruppen");
+
+    if (!container) return { groups, flat: [] };
+
+    Array.from(container.querySelectorAll(".zutatengruppe")).forEach((gruppe, gi) => {
+      const groupNameEl = gruppe.querySelector(".zutaten-gruppenname");
+      const groupName = groupNameEl && groupNameEl.value.trim()
+        ? groupNameEl.value.trim()
+        : (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1));
+
+      const zutaten = [];
+
+      Array.from(gruppe.querySelectorAll(".zutaten-zeile, .zutat-zeile")).forEach(row => {
+        const menge = row.querySelector(".zutat-menge")?.value?.trim() || "";
+        const einheit = row.querySelector(".zutat-einheit")?.value?.trim() || "";
+        const name = row.querySelector(".zutat-name")?.value?.trim() || "";
+        if (menge || einheit || name) zutaten.push({ menge, einheit, name });
+      });
+
+      if (zutaten.length) groups.push({ name: groupName, zutaten });
+    });
+
+    const flat = groups.flatMap(g => g.zutaten || []);
+    return { groups, flat };
+  }
+
+  function makeRecipeFromForm(existing) {
+    const z = readZutaten();
+
+    return {
+      id: existing && existing.id ? existing.id : (crypto && crypto.randomUUID ? crypto.randomUUID() : "rezept_" + Date.now()),
+      name: $("nameInput")?.value?.trim() || "",
+      kategorie: $("kategorieInput")?.value || "Nicht zugeordnet",
+      portionen: $("portionenInput")?.value?.trim() || "",
+      schwierigkeit: $("schwierigkeitInput")?.value?.trim() || "",
+      zubereitungszeit: $("zubereitungszeitInput")?.value?.trim() || "",
+      quelle: $("quelleInput")?.value?.trim() || "",
+      tags: ($("tagsInput")?.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean),
+      zubereitung: $("zubereitungInput")?.value?.trim() || "",
+      utensilien: ($("utensilienInput")?.value || "").split(",").map(x => x.trim()).filter(Boolean),
+      notizen: $("notizenInput")?.value?.trim() || "",
+      naehrwerte: {
+        kalorien: $("kalorienInput")?.value?.trim() || "",
+        eiweiss: $("eiweissInput")?.value?.trim() || "",
+        kohlenhydrate: $("kohlenhydrateInput")?.value?.trim() || "",
+        fett: $("fettInput")?.value?.trim() || "",
+        zucker: $("zuckerInput")?.value?.trim() || "",
+        ballaststoffe: $("ballaststoffeInput")?.value?.trim() || "",
+        salz: $("salzInput")?.value?.trim() || ""
+      },
+      zutatenGruppen: z.groups,
+      zutaten: z.flat,
+      ausprobiert: $("ausprobiertInput") ? $("ausprobiertInput").value === "true" : (existing ? !!existing.ausprobiert : false),
+      favorit: existing ? !!existing.favorit : false,
+      bewertung: existing ? Number(existing.bewertung || 0) : 0,
+      erstelltAm: existing && existing.erstelltAm ? existing.erstelltAm : new Date().toISOString(),
+      aktualisiertAm: new Date().toISOString()
+    };
+  }
+
+  function goCleanStart() {
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    const ergebnisse = $("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      ergebnisse.hidden = true;
+      ergebnisse.style.display = "none";
+    }
+
+    document.body.classList.add("rf205-start");
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(e) {}
+  }
+
+  function saveEditedOrNewRecipe() {
+    const list = loadRezepte();
+    const idx = currentEditIndex();
+    const existing = (idx !== null && idx !== undefined && list[idx]) ? list[idx] : null;
+    const recipe = makeRecipeFromForm(existing);
+
+    if (!recipe.name) {
+      alert("Bitte einen Rezeptnamen eingeben.");
+      return false;
+    }
+
+    if (!recipe.zutaten.length) {
+      alert("Bitte mindestens eine Zutat eingeben.");
+      return false;
+    }
+
+    if (!recipe.zubereitung) {
+      alert("Bitte eine Zubereitung eingeben.");
+      return false;
+    }
+
+    if (existing && idx !== null && idx !== undefined) {
+      list[idx] = recipe;
+    } else {
+      list.push(recipe);
+    }
+
+    saveRezepte(list);
+
+    rf213EditingIndex = null;
+    try { bearbeitungsIndex = null; } catch(e) {}
+    window.bearbeitungsIndex = null;
+    document.body.classList.remove("bearbeitet-modus");
+
+    if (typeof dashboardAktualisieren === "function") {
+      try { dashboardAktualisieren(); } catch(e) {}
+    }
+
+    if (typeof meldungAnzeigen === "function") {
+      meldungAnzeigen("Rezept gespeichert.");
+    } else {
+      alert("Rezept gespeichert.");
+    }
+
+    goCleanStart();
+    return true;
+  }
+
+  // Bearbeiten-Index merken, wenn Bearbeiten funktioniert und Formular geöffnet wird.
+  const oldBearbeiten213 = window.rezeptBearbeiten;
+  window.rezeptBearbeiten = function(index) {
+    rf213EditingIndex = Number(index);
+    window.bearbeitungsIndex = Number(index);
+    try { bearbeitungsIndex = Number(index); } catch(e) {}
+    if (typeof oldBearbeiten213 === "function" && oldBearbeiten213 !== window.rezeptBearbeiten) {
+      return oldBearbeiten213(index);
+    }
+    if (typeof window.rf212RezeptBearbeiten === "function") {
+      return window.rf212RezeptBearbeiten(index);
+    }
+    return false;
+  };
+
+  window.rf213RezeptSpeichern = saveEditedOrNewRecipe;
+  window.rf212RezeptSpeichern = saveEditedOrNewRecipe;
+  window.rezeptSpeichern = saveEditedOrNewRecipe;
+  window.rezeptSpeichernDirektCloud = saveEditedOrNewRecipe;
+  window.rf155RezeptSpeichern = saveEditedOrNewRecipe;
+
+  try {
+    rezeptSpeichern = saveEditedOrNewRecipe;
+    rezeptSpeichernDirektCloud = saveEditedOrNewRecipe;
+    rf155RezeptSpeichern = saveEditedOrNewRecipe;
+  } catch(e) {}
+
+  function bindSaveButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (
+        text === "rezept speichern" ||
+        text === "speichern" ||
+        onclick.includes("rf155RezeptSpeichern") ||
+        onclick.includes("rezeptSpeichern")
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return saveEditedOrNewRecipe();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+
+    if (text === "rezept speichern" || text === "speichern") {
+      event.preventDefault();
+      event.stopPropagation();
+      return saveEditedOrNewRecipe();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    bindSaveButtons();
+    setTimeout(bindSaveButtons, 300);
+    setTimeout(bindSaveButtons, 1000);
+    setTimeout(bindSaveButtons, 2000);
+  });
+})();
