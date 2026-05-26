@@ -918,3 +918,34 @@ body.rf196-startseite #datenpruefungBereich {
   font-weight: 600;
   cursor: pointer;
 }
+
+
+/* VERSION 2.04 Backup Button fest sichtbar */
+#rf204BackupToggle {
+  background: #2f7df6 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 18px 34px !important;
+  min-width: 260px !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#rf204BackupPanel.versteckt {
+  display: none !important;
+}
+
+#rf204BackupPanel {
+  margin-top: 18px;
+}
+
+#rf204BackupButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
