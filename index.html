@@ -8,7 +8,7 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v2.00 Cloud</title>
+  <title>Rezeptfinder v2.01 Cloud</title>
   <link rel="stylesheet" href="style.css?v=199">
 </head>
 <body>
@@ -27,7 +27,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v2.00 Cloud</p>
+    <p class="version">Rezeptfinder v2.01 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -53,6 +53,8 @@
     
     <button onclick="rezeptAssistentToggle()">Rezept-Assistent</button>
     <button onclick="hauptbereichToggle('datenpruefungBereich', false, false, true)">Rezepte prüfen</button>
+    <button id="rf201BackupToggle" type="button">Backup anzeigen</button>
+
 </section>
 
   
@@ -275,8 +277,15 @@ Fülle auf den Teig geben.
 
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
-  <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v2.00 Cloud</footer>
+  
+<section id="rf201BackupPanel" class="box versteckt">
+  <h2>Backup</h2>
+  <p>Hier findest du deine Backup- und Cloud-Funktionen.</p>
+  <div id="rf201BackupButtons" class="button-gruppe"></div>
+</section>
+
+<section id="ergebnisse"></section>
+  <footer>Rezeptfinder v2.01 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js?v=199"></script>

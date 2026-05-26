@@ -843,3 +843,23 @@ body.rf196-startseite #datenpruefungBereich {
 #rf200BackupPanel.open{
   display:block;
 }
+
+
+/* VERSION 2.01 Backup-Button direkt in Startübersicht */
+#rf201BackupPanel.versteckt {
+  display: none !important;
+}
+
+#rf201BackupPanel {
+  margin-top: 18px;
+}
+
+#rf201BackupButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#rf201BackupButtons button {
+  margin: 4px;
+}
