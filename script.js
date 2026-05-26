@@ -25818,3 +25818,290 @@ window.addEventListener("load", function () {
     setTimeout(bindStartButtons, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.08 Fix: Suche, Einkaufsliste, Rezepte prüfen
+// Ursache: v2.07 hat einige Startbuttons zu stark überschrieben.
+// Jetzt werden die originalen Bereichs-/Suchfunktionen wieder genutzt.
+// =====================================================
+
+(function () {
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  function show(node) {
+    if (!node) return;
+    node.hidden = false;
+    node.style.display = "";
+    node.classList.remove("versteckt");
+  }
+
+  function hide(node) {
+    if (!node) return;
+    node.hidden = true;
+    node.style.display = "none";
+    node.classList.add("versteckt");
+  }
+
+  function hideArbeitsbereiche(exceptId) {
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      if (id !== exceptId) hide(el(id));
+    });
+  }
+
+  function leaveStart() {
+    document.body.classList.remove("rf205-start");
+    document.body.classList.remove("rf196-startseite");
+    document.body.classList.remove("startseite-clean");
+    const ergebnisse = el("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.hidden = false;
+      ergebnisse.style.display = "";
+    }
+  }
+
+  function ensureRezepteLoaded() {
+    try {
+      const raw = localStorage.getItem("rezepte");
+      if (raw && (!Array.isArray(window.rezepte) || window.rezepte.length === 0)) {
+        window.rezepte = JSON.parse(raw) || [];
+      }
+    } catch (e) {}
+  }
+
+  // ----------------------------
+  // REZEPTE SUCHEN
+  // ----------------------------
+  function rf208RezepteSuchenOeffnen() {
+    leaveStart();
+    ensureRezepteLoaded();
+    hideArbeitsbereiche("rezeptSucheBereich");
+
+    const suchBereich = el("rezeptSucheBereich");
+    show(suchBereich);
+
+    const ergebnisse = el("ergebnisse");
+    show(ergebnisse);
+    if (ergebnisse) ergebnisse.innerHTML = "";
+
+    // Dropdowns/Filter wieder aktualisieren, aber KEINE Suche erzwingen.
+    try { if (typeof suchTagsDropdownAktualisieren === "function") suchTagsDropdownAktualisieren(); } catch(e) {}
+    try { if (typeof quellenDropdownAktualisieren === "function") quellenDropdownAktualisieren(); } catch(e) {}
+    try { if (typeof suchKategorienAktualisieren === "function") suchKategorienAktualisieren(); } catch(e) {}
+    try { if (typeof kategorienDropdownAktualisieren === "function") kategorienDropdownAktualisieren(); } catch(e) {}
+
+    try { suchBereich && suchBereich.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    return false;
+  }
+
+  function rf208SuchenAusfuehren() {
+    leaveStart();
+    ensureRezepteLoaded();
+    show(el("rezeptSucheBereich"));
+    show(el("ergebnisse"));
+
+    // Wichtig: originale Suchfunktion verwenden, nicht nur alle Ergebnisse anzeigen.
+    const candidates = [
+      "rezeptSucheAusfuehrenOriginal",
+      "rezeptSucheAusfuehrenAlt",
+      "rezeptSucheAusfuehren"
+    ];
+
+    for (const name of candidates) {
+      try {
+        const fn = window[name] || globalThis[name];
+        if (typeof fn === "function" && fn !== rf208SuchenAusfuehren) {
+          return fn();
+        }
+      } catch(e) {
+        console.error("Suchfunktion Fehler:", e);
+      }
+    }
+
+    // Fallback: einfache Suche über sichtbare Felder
+    const nameQuery = (el("suchNameInput")?.value || "").trim().toLowerCase();
+    const tagQuery = (el("suchTagsInput")?.value || "").trim().toLowerCase();
+    const quelleQuery = (el("suchQuelleInput")?.value || "").trim().toLowerCase();
+    const kategorieQuery = (el("suchKategorieInput")?.value || "").trim().toLowerCase();
+    const ausprobiert = el("suchAusprobiertInput")?.value || "";
+
+    const list = (Array.isArray(window.rezepte) ? window.rezepte : []).filter(r => {
+      const nameOk = !nameQuery || String(r.name || "").toLowerCase().includes(nameQuery);
+      const tagsOk = !tagQuery || (Array.isArray(r.tags) ? r.tags.join(" ") : String(r.tags || "")).toLowerCase().includes(tagQuery);
+      const quelleOk = !quelleQuery || String(r.quelle || "").toLowerCase().includes(quelleQuery);
+      const katOk = !kategorieQuery || String(r.kategorie || "").toLowerCase() === kategorieQuery;
+      const ausOk = ausprobiert === "" || String(!!r.ausprobiert) === ausprobiert;
+      return nameOk && tagsOk && quelleOk && katOk && ausOk;
+    });
+
+    if (typeof zeigeErgebnisse === "function") {
+      zeigeErgebnisse(list.map((r, index) => ({ ...r, index })));
+    }
+
+    const treffer = el("suchTrefferAnzeige");
+    if (treffer) treffer.textContent = list.length + " Treffer";
+
+    return false;
+  }
+
+  // ----------------------------
+  // EINKAUFSLISTE
+  // ----------------------------
+  function rf208EinkaufslisteOeffnen() {
+    leaveStart();
+    hideArbeitsbereiche("einkaufBereich");
+    hide(el("ergebnisse"));
+
+    const bereich = el("einkaufBereich");
+    show(bereich);
+
+    try {
+      if (typeof einkaufslisteAnzeigen === "function") einkaufslisteAnzeigen();
+      else if (typeof window.einkaufslisteAnzeigen === "function") window.einkaufslisteAnzeigen();
+    } catch(e) {
+      console.error("Einkaufsliste anzeigen Fehler:", e);
+    }
+
+    try { if (typeof rf188FormatExistingList === "function") setTimeout(rf188FormatExistingList, 100); } catch(e) {}
+    try { if (typeof rf181FormatEinkaufsliste === "function") setTimeout(rf181FormatEinkaufsliste, 150); } catch(e) {}
+
+    try { bereich && bereich.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    return false;
+  }
+
+  // ----------------------------
+  // REZEPTE PRÜFEN
+  // ----------------------------
+  function rf208RezeptePruefenOeffnen() {
+    leaveStart();
+    ensureRezepteLoaded();
+    hideArbeitsbereiche("datenpruefungBereich");
+    hide(el("ergebnisse"));
+
+    const bereich = el("datenpruefungBereich");
+    show(bereich);
+
+    let called = false;
+    const names = [
+      "datenpruefungAnzeigen",
+      "datenPruefen",
+      "rezeptePruefen",
+      "datenpruefungStarten",
+      "datenpruefungToggle"
+    ];
+
+    for (const name of names) {
+      try {
+        const fn = window[name] || globalThis[name];
+        if (typeof fn === "function" && fn !== rf208RezeptePruefenOeffnen) {
+          fn();
+          called = true;
+          break;
+        }
+      } catch(e) {
+        console.error("Rezepte prüfen Fehler:", name, e);
+      }
+    }
+
+    // Fallback: einfachen Prüf-Inhalt anzeigen
+    if (!called) {
+      const inhalt = el("datenpruefungInhalt");
+      if (inhalt) {
+        const list = Array.isArray(window.rezepte) ? window.rezepte : [];
+        const probleme = [];
+
+        list.forEach((r, i) => {
+          if (!r.name) probleme.push("Rezept " + (i + 1) + ": Name fehlt");
+          if (!r.zutaten || !r.zutaten.length) probleme.push((r.name || "Rezept " + (i + 1)) + ": Zutaten fehlen");
+          if (!r.zubereitung) probleme.push((r.name || "Rezept " + (i + 1)) + ": Zubereitung fehlt");
+        });
+
+        inhalt.innerHTML = probleme.length
+          ? "<ul>" + probleme.map(p => "<li>" + p + "</li>").join("") + "</ul>"
+          : "<p>Keine offensichtlichen Probleme gefunden.</p>";
+      }
+    }
+
+    try { bereich && bereich.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    return false;
+  }
+
+  // Originale Suchfunktion sichern, bevor wir Buttons überschreiben
+  if (typeof window.rezeptSucheAusfuehren === "function" && window.rezeptSucheAusfuehren !== rf208SuchenAusfuehren) {
+    window.rezeptSucheAusfuehrenOriginal = window.rezeptSucheAusfuehren;
+  }
+
+  function bind() {
+    const mapping = [
+      ["rf207RezepteSuchen", rf208RezepteSuchenOeffnen],
+      ["rf207Einkaufsliste", rf208EinkaufslisteOeffnen],
+      ["rf207RezeptePruefen", rf208RezeptePruefenOeffnen]
+    ];
+
+    mapping.forEach(([id, handler]) => {
+      const btn = el(id);
+      if (btn) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return handler();
+        };
+      }
+    });
+
+    // Textbasierte Bindung, falls IDs durch alte HTML-Struktur fehlen
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (text === "rezepte suchen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) { event.preventDefault(); event.stopPropagation(); }
+          return rf208RezepteSuchenOeffnen();
+        };
+      }
+
+      if (text === "suchen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) { event.preventDefault(); event.stopPropagation(); }
+          return rf208SuchenAusfuehren();
+        };
+      }
+
+      if (text === "einkaufsliste") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) { event.preventDefault(); event.stopPropagation(); }
+          return rf208EinkaufslisteOeffnen();
+        };
+      }
+
+      if (text === "rezepte prüfen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) { event.preventDefault(); event.stopPropagation(); }
+          return rf208RezeptePruefenOeffnen();
+        };
+      }
+    });
+  }
+
+  window.rf208RezepteSuchenOeffnen = rf208RezepteSuchenOeffnen;
+  window.rf208EinkaufslisteOeffnen = rf208EinkaufslisteOeffnen;
+  window.rf208RezeptePruefenOeffnen = rf208RezeptePruefenOeffnen;
+  window.rf208SuchenAusfuehren = rf208SuchenAusfuehren;
+
+  window.addEventListener("load", function() {
+    bind();
+    setTimeout(bind, 300);
+    setTimeout(bind, 1000);
+    setTimeout(bind, 2000);
+  });
+})();
