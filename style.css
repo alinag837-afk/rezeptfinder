@@ -759,3 +759,9 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 .rf190-cloud-hidden {
   display: none !important;
 }
+
+
+/* VERSION 1.94 Assistent wirklich schließen */
+#textImportBereich.rf194-closed {
+  display: none !important;
+}
