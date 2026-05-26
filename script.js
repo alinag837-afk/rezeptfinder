@@ -27743,3 +27743,204 @@ window.addEventListener("load", function () {
     setTimeout(bindButtons, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.15 Fix: Button "Jetzt in Cloud speichern"
+// Der Button ruft jetzt immer direkt den funktionierenden Upload auf.
+// Alte Blockaden wie "nur echter Button-Klick" werden umgangen.
+// =====================================================
+
+(function () {
+  let rf215CloudBusy = false;
+
+  function rf215Status(text, error) {
+    try {
+      if (typeof cloudStatus === "function") cloudStatus(text, !!error);
+      else {
+        const el = document.getElementById("cloudStatus");
+        if (el) el.textContent = text;
+        console.log(text);
+      }
+    } catch(e) {
+      console.log(text);
+    }
+  }
+
+  function rf215LoadLocalRecipes() {
+    let list = [];
+
+    try {
+      list = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch(e) {
+      list = [];
+    }
+
+    if (!Array.isArray(list)) list = [];
+
+    list = list
+      .filter(r => r && !r.geloescht && !r.deleted && !r.__deleted && r.id !== "__rezeptfinder_deleted_keys__")
+      .map(r => {
+        if (!r.id) {
+          try {
+            r.id = crypto.randomUUID();
+          } catch(e) {
+            r.id = "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+          }
+        }
+        return r;
+      });
+
+    try {
+      window.rezepte = list;
+      rezepte = list;
+    } catch(e) {
+      window.rezepte = list;
+    }
+
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    return list;
+  }
+
+  function rf215Client() {
+    try {
+      if (typeof cloudInit === "function") cloudInit();
+    } catch(e) {}
+
+    const client = window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null);
+
+    if (!client) {
+      throw new Error("Supabase ist nicht verbunden.");
+    }
+
+    return client;
+  }
+
+  async function rf215CloudSpeichern() {
+    if (rf215CloudBusy) {
+      rf215Status("Cloud-Speichern läuft bereits ...");
+      return false;
+    }
+
+    rf215CloudBusy = true;
+
+    try {
+      const client = rf215Client();
+      const list = rf215LoadLocalRecipes();
+
+      rf215Status("speichere in Cloud ...");
+
+      // Alte Cloud-Zeilen entfernen, damit gelöschte Rezepte nicht wiederkommen.
+      const { data, error: selectError } = await client
+        .from("rezepte")
+        .select("id");
+
+      if (selectError) throw selectError;
+
+      const ids = (data || [])
+        .map(row => row.id)
+        .filter(id => id && id !== "__rezeptfinder_deleted_keys__");
+
+      for (const id of ids) {
+        const { error: deleteError } = await client
+          .from("rezepte")
+          .delete()
+          .eq("id", id);
+
+        if (deleteError) {
+          console.warn("Cloud-Zeile konnte nicht gelöscht werden:", id, deleteError);
+        }
+      }
+
+      const rows = list.map(r => ({
+        id: String(r.id),
+        name: r.name || "Unbenanntes Rezept",
+        daten: JSON.parse(JSON.stringify(r)),
+        aktualisiert_am: new Date().toISOString()
+      }));
+
+      if (rows.length) {
+        const { error: upsertError } = await client
+          .from("rezepte")
+          .upsert(rows, { onConflict: "id" });
+
+        if (upsertError) throw upsertError;
+      }
+
+      rf215Status(rows.length + " Rezept(e) in Cloud gespeichert.");
+      if (typeof meldungAnzeigen === "function") {
+        meldungAnzeigen(rows.length + " Rezept(e) in Cloud gespeichert.");
+      } else {
+        alert(rows.length + " Rezept(e) in Cloud gespeichert.");
+      }
+
+      return true;
+    } catch(e) {
+      console.error("Cloud-Speichern v2.15 Fehler:", e);
+      rf215Status("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      setTimeout(() => {
+        rf215CloudBusy = false;
+      }, 1200);
+    }
+  }
+
+  // Alle alten Namen auf die funktionierende Funktion legen.
+  window.rf215CloudSpeichern = rf215CloudSpeichern;
+  window.cloudSpeichernAlle = rf215CloudSpeichern;
+  window.cloudSpeichernAlleDirekt = rf215CloudSpeichern;
+  window.cloudSpeichernAlleDirekt1294 = rf215CloudSpeichern;
+  window.rf177CloudSaveButton = rf215CloudSpeichern;
+  window.rf176CloudSaveReplace = rf215CloudSpeichern;
+
+  try {
+    cloudSpeichernAlle = rf215CloudSpeichern;
+    cloudSpeichernAlleDirekt = rf215CloudSpeichern;
+    cloudSpeichernAlleDirekt1294 = rf215CloudSpeichern;
+  } catch(e) {}
+
+  function rf215BindCloudSaveButton() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (
+        text === "jetzt in cloud speichern" ||
+        text.includes("cloud speichern") ||
+        onclick.includes("cloudSpeichernAlle")
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf215CloudSpeichern();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+
+    if (text === "jetzt in cloud speichern" || text.includes("cloud speichern")) {
+      event.preventDefault();
+      event.stopPropagation();
+      return rf215CloudSpeichern();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    rf215BindCloudSaveButton();
+    setTimeout(rf215BindCloudSaveButton, 300);
+    setTimeout(rf215BindCloudSaveButton, 1000);
+    setTimeout(rf215BindCloudSaveButton, 2000);
+  });
+})();
