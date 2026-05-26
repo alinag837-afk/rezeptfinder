@@ -1844,3 +1844,44 @@ main.container > section.box:first-of-type .button-gruppe > button:nth-child(7) 
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* VERSION 2.17 Backup-Button an andere Buttons angepasst */
+#backupStartButton {
+  width: 270px !important;
+  min-width: 270px !important;
+  max-width: 270px !important;
+
+  height: 74px !important;
+  min-height: 74px !important;
+  max-height: 74px !important;
+
+  margin: 0 !important;
+  padding: 0 18px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+}
+
+/* Doppelte Backup-Buttons sicher ausblenden */
+button:not(#backupStartButton) {
+}
+
+#startButtonGrid button + #backupStartButton {
+  display: inline-flex !important;
+}
+
+/* alte oder doppelte Backup anzeigen Buttons verstecken */
+button[id^="rf"][id*="Backup"],
+button[id^="backupStartButton"]:not(#backupStartButton) {
+  display: none !important;
+}
