@@ -1021,3 +1021,22 @@ body.rf205-start #rf205BackupPanel {
   width: 100% !important;
   box-sizing: border-box !important;
 }
+
+
+/* VERSION 2.06 Backup wieder direkt in Übersicht */
+#rf205BackupToggle,
+#rf204BackupToggle,
+#rf203BackupToggle,
+#rf202BackupToggle,
+#rf201BackupToggle,
+#rf200BackupToggle,
+#rf197BackupToggle,
+#rf205BackupPanel,
+#rf204BackupPanel,
+#rf203BackupPanel,
+#rf202BackupPanel,
+#rf201BackupPanel,
+#rf200BackupPanel,
+#rf197BackupPanel {
+  display: none !important;
+}

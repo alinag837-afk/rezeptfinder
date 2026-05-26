@@ -25475,3 +25475,105 @@ window.addEventListener("load", function () {
     setTimeout(bindMainButtons, 1500);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.06 Backup wieder direkt in der Übersicht
+// Kein Backup-Ausklappbutton mehr.
+// =====================================================
+
+(function () {
+  function rf206RemoveBackupToggleUi() {
+    [
+      "rf205BackupToggle", "rf204BackupToggle", "rf203BackupToggle", "rf202BackupToggle",
+      "rf201BackupToggle", "rf200BackupToggle", "rf197BackupToggle",
+      "rf205BackupPanel", "rf204BackupPanel", "rf203BackupPanel", "rf202BackupPanel",
+      "rf201BackupPanel", "rf200BackupPanel", "rf197BackupPanel"
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+  }
+
+  function rf206EnsureBackupButtonsInOverview() {
+    rf206RemoveBackupToggleUi();
+
+    const startButton = Array.from(document.querySelectorAll("button")).find(btn => {
+      const t = (btn.textContent || "").trim().toLowerCase();
+      return t === "rezepte prüfen" || t === "rezept-assistent" || t === "einkaufsliste";
+    });
+
+    const group = startButton ? startButton.parentElement : null;
+    if (!group) return;
+
+    const needed = [
+      ["Jetzt in Cloud speichern", function () {
+        if (typeof cloudSpeichernAlle === "function") return cloudSpeichernAlle();
+        if (typeof window.cloudSpeichernAlle === "function") return window.cloudSpeichernAlle();
+        alert("Cloud-Speichern wurde nicht gefunden.");
+      }],
+      ["Aus Cloud laden", function () {
+        if (typeof cloudLaden === "function") return cloudLaden();
+        if (typeof window.cloudLaden === "function") return window.cloudLaden();
+        alert("Cloud-Laden wurde nicht gefunden.");
+      }],
+      ["Cloud-Backups anzeigen", function () {
+        if (typeof cloudBackupsAnzeigen === "function") return cloudBackupsAnzeigen();
+        if (typeof cloudBackupAnzeigen === "function") return cloudBackupAnzeigen();
+        if (typeof backupsAnzeigen === "function") return backupsAnzeigen();
+        alert("Cloud-Backups wurden nicht gefunden.");
+      }],
+      ["Manuelles Backup herunterladen", function () {
+        if (typeof backupHerunterladen === "function") return backupHerunterladen();
+        if (typeof backupExportieren === "function") return backupExportieren();
+        if (typeof datenExportieren === "function") return datenExportieren();
+        if (typeof manuellesBackupHerunterladen === "function") return manuellesBackupHerunterladen();
+        alert("Backup-Download wurde nicht gefunden.");
+      }]
+    ];
+
+    needed.forEach(([label, handler]) => {
+      const exists = Array.from(group.querySelectorAll("button")).some(btn =>
+        (btn.textContent || "").trim().toLowerCase() === label.toLowerCase()
+      );
+
+      if (!exists) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.onclick = handler;
+        group.appendChild(btn);
+      }
+    });
+  }
+
+  window.rf205BackupToggle = function () { return false; };
+  window.rf204BackupToggle = function () { return false; };
+  window.rf203ToggleBackupPanel = function () { return false; };
+  window.rf202BackupToggle = function () { return false; };
+
+  if (typeof window.cloudBackupsAnzeigen !== "function") {
+    window.cloudBackupsAnzeigen = function () {
+      if (typeof cloudBackupAnzeigen === "function") return cloudBackupAnzeigen();
+      if (typeof backupsAnzeigen === "function") return backupsAnzeigen();
+      alert("Cloud-Backups wurden nicht gefunden.");
+    };
+  }
+
+  if (typeof window.backupHerunterladen !== "function") {
+    window.backupHerunterladen = function () {
+      if (typeof backupExportieren === "function") return backupExportieren();
+      if (typeof datenExportieren === "function") return datenExportieren();
+      if (typeof manuellesBackupHerunterladen === "function") return manuellesBackupHerunterladen();
+      alert("Backup-Download wurde nicht gefunden.");
+    };
+  }
+
+  window.addEventListener("load", function () {
+    rf206EnsureBackupButtonsInOverview();
+    setTimeout(rf206EnsureBackupButtonsInOverview, 300);
+    setTimeout(rf206EnsureBackupButtonsInOverview, 1000);
+    setTimeout(rf206EnsureBackupButtonsInOverview, 2000);
+  });
+})();
