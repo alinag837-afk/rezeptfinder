@@ -26636,3 +26636,203 @@ window.addEventListener("load", function () {
     setTimeout(rf210BindButton, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.11 Fix: Rezept bearbeiten funktioniert wieder
+// =====================================================
+
+(function () {
+
+  function rf211Show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+  }
+
+  function rf211Hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = "none";
+    el.classList.add("versteckt");
+  }
+
+  function rf211LoadRezepte() {
+    try {
+      const raw = localStorage.getItem("rezepte");
+      if (raw) {
+        window.rezepte = JSON.parse(raw) || [];
+        try { rezepte = window.rezepte; } catch(e) {}
+      }
+    } catch(e) {}
+
+    try {
+      if ((!window.rezepte || !Array.isArray(window.rezepte)) && Array.isArray(rezepte)) {
+        window.rezepte = rezepte;
+      }
+    } catch(e) {}
+
+    if (!Array.isArray(window.rezepte)) window.rezepte = [];
+    return window.rezepte;
+  }
+
+  function rf211OriginalBearbeiten(index) {
+    const candidates = [
+      "rf186Bearbeiten",
+      "rezeptBearbeitenOriginal",
+      "rezeptBearbeitenAlt",
+      "bearbeiten",
+      "bearbeiteRezept"
+    ];
+
+    for (const name of candidates) {
+      try {
+        const fn = window[name] || globalThis[name];
+        if (typeof fn === "function") {
+          return fn(index);
+        }
+      } catch(e) {
+        console.error("Bearbeiten Kandidat Fehler:", name, e);
+      }
+    }
+
+    return false;
+  }
+
+  function rf211FallbackBearbeiten(index) {
+    const rezepteListe = rf211LoadRezepte();
+    const rezept = rezepteListe[index];
+
+    if (!rezept) {
+      alert("Rezept wurde nicht gefunden.");
+      return false;
+    }
+
+    document.body.classList.remove("rf205-start", "rf196-startseite", "startseite-clean");
+
+    ["rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) rf211Hide(el);
+    });
+
+    const ergebnisse = document.getElementById("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      rf211Hide(ergebnisse);
+    }
+
+    const formular = document.getElementById("formularBereich");
+    rf211Show(formular);
+
+    // Bearbeitungsmodus setzen
+    window.rezeptBearbeitenIndex = index;
+    try { rezeptBearbeitenIndex = index; } catch(e) {}
+
+    // Grundfelder
+    const map = {
+      rezeptName: rezept.name || "",
+      rezeptQuelle: rezept.quelle || "",
+      rezeptKategorie: rezept.kategorie || "",
+      rezeptPortionen: rezept.portionen || "",
+      rezeptZubereitung: rezept.zubereitung || "",
+      rezeptNotizen: rezept.notizen || "",
+      rezeptSchwierigkeit: rezept.schwierigkeit || "",
+      rezeptBewertung: rezept.bewertung || "",
+      rezeptBild: rezept.bild || "",
+      rezeptZeit: rezept.zeit || ""
+    };
+
+    Object.entries(map).forEach(([id, value]) => {
+      const input = document.getElementById(id);
+      if (input) input.value = value;
+    });
+
+    // Tags
+    const tagsInput = document.getElementById("rezeptTags");
+    if (tagsInput) {
+      tagsInput.value = Array.isArray(rezept.tags)
+        ? rezept.tags.join(", ")
+        : (rezept.tags || "");
+    }
+
+    // Zutaten
+    const zutatenContainer =
+      document.getElementById("zutatenContainer") ||
+      document.getElementById("zutatenListe");
+
+    if (zutatenContainer) {
+      zutatenContainer.innerHTML = "";
+
+      const zutaten = Array.isArray(rezept.zutaten)
+        ? rezept.zutaten
+        : [];
+
+      zutaten.forEach(z => {
+        let menge = "";
+        let einheit = "";
+        let name = "";
+
+        if (typeof z === "string") {
+          name = z;
+        } else {
+          menge = z.menge || "";
+          einheit = z.einheit || "";
+          name = z.name || z.zutat || "";
+        }
+
+        const row = document.createElement("div");
+        row.className = "zutat-zeile";
+        row.innerHTML = `
+          <input type="text" class="zutat-menge" placeholder="Menge" value="${String(menge).replace(/"/g, '&quot;')}">
+          <input type="text" class="zutat-einheit" placeholder="Einheit" value="${String(einheit).replace(/"/g, '&quot;')}">
+          <input type="text" class="zutat-name" placeholder="Zutat" value="${String(name).replace(/"/g, '&quot;')}">
+        `;
+        zutatenContainer.appendChild(row);
+      });
+    }
+
+    // Utensilien
+    const utensilienInput = document.getElementById("rezeptUtensilien");
+    if (utensilienInput) {
+      utensilienInput.value = Array.isArray(rezept.utensilien)
+        ? rezept.utensilien.join(", ")
+        : (rezept.utensilien || "");
+    }
+
+    try {
+      formular && formular.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch(e) {}
+
+    return true;
+  }
+
+  // Aktuelle funktionierende Bearbeiten-Funktion sichern
+  if (typeof window.rezeptBearbeiten === "function") {
+    window.rezeptBearbeitenOriginal = window.rezeptBearbeiten;
+  }
+
+  window.rezeptBearbeiten = function(index) {
+    try {
+      if (typeof window.rezeptBearbeitenOriginal === "function") {
+        const result = window.rezeptBearbeitenOriginal(index);
+
+        // Wenn Originalfunktion erfolgreich war → fertig
+        if (result !== false && result !== null) {
+          return result;
+        }
+      }
+    } catch(e) {
+      console.error("Original Bearbeiten Fehler:", e);
+    }
+
+    // Fallback
+    return rf211FallbackBearbeiten(index);
+  };
+
+  window.rf210RezeptAusPruefungBearbeiten = function(index) {
+    return window.rezeptBearbeiten(index);
+  };
+
+})();
