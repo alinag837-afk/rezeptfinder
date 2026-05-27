@@ -29173,3 +29173,359 @@ window.addEventListener("load", function () {
     setTimeout(rf222BindButton, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.23 Fix: Neue Rezepte doppelt + Löschen löscht beide
+// Ursache: gleiche IDs / mehrere Speicherhandler.
+// Fix:
+// - neuer Eintrag bekommt immer neue ID
+// - Bearbeiten ersetzt per gemerkter ID
+// - Duplikate mit gleicher ID werden getrennt
+// - Löschen löscht nur einen Listenplatz
+// =====================================================
+
+(function () {
+  const EDIT_ID_KEY = "rf223_edit_id";
+  const EDIT_INDEX_KEY = "rf223_edit_index";
+  let rf223Saving = false;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function newId() {
+    try {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch(e) {}
+    return "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function loadList() {
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch(e) {
+      list = [];
+    }
+
+    if (!Array.isArray(list)) list = [];
+
+    // Wichtig: gleiche IDs trennen, statt gleiche IDs beizubehalten.
+    const used = new Set();
+    list.forEach(r => {
+      if (!r) return;
+      if (!r.id) r.id = newId();
+      if (used.has(String(r.id))) {
+        r.id = newId();
+        r.aktualisiertAm = new Date().toISOString();
+      }
+      used.add(String(r.id));
+    });
+
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    return list;
+  }
+
+  function saveList(list) {
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+    localStorage.setItem("rezepte", JSON.stringify(list));
+  }
+
+  function rememberEdit(index) {
+    const list = loadList();
+    const i = Number(index);
+
+    if (Number.isInteger(i) && i >= 0 && i < list.length && list[i]) {
+      if (!list[i].id) list[i].id = newId();
+      sessionStorage.setItem(EDIT_ID_KEY, String(list[i].id));
+      sessionStorage.setItem(EDIT_INDEX_KEY, String(i));
+      window.bearbeitungsIndex = i;
+      try { bearbeitungsIndex = i; } catch(e) {}
+      saveList(list);
+      return true;
+    }
+
+    sessionStorage.removeItem(EDIT_ID_KEY);
+    sessionStorage.removeItem(EDIT_INDEX_KEY);
+    return false;
+  }
+
+  function clearEdit() {
+    sessionStorage.removeItem(EDIT_ID_KEY);
+    sessionStorage.removeItem(EDIT_INDEX_KEY);
+    window.bearbeitungsIndex = null;
+    try { bearbeitungsIndex = null; } catch(e) {}
+  }
+
+  function currentEdit() {
+    const id = sessionStorage.getItem(EDIT_ID_KEY) || "";
+    const raw = sessionStorage.getItem(EDIT_INDEX_KEY);
+    const index = raw !== null && raw !== "" ? Number(raw) : null;
+    return { id, index: Number.isInteger(index) ? index : null };
+  }
+
+  function readZutaten() {
+    const groups = [];
+    const container = $("zutatenGruppen");
+
+    if (!container) return { groups, flat: [] };
+
+    Array.from(container.querySelectorAll(".zutatengruppe")).forEach((gruppe, gi) => {
+      const groupNameEl = gruppe.querySelector(".zutaten-gruppenname");
+      const groupName = groupNameEl && groupNameEl.value.trim()
+        ? groupNameEl.value.trim()
+        : (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1));
+
+      const zutaten = [];
+
+      Array.from(gruppe.querySelectorAll(".zutaten-zeile, .zutat-zeile")).forEach(row => {
+        const menge = row.querySelector(".zutat-menge")?.value?.trim() || "";
+        const einheit = row.querySelector(".zutat-einheit")?.value?.trim() || "";
+        const name = row.querySelector(".zutat-name")?.value?.trim() || "";
+        if (menge || einheit || name) zutaten.push({ menge, einheit, name });
+      });
+
+      if (zutaten.length) groups.push({ name: groupName, zutaten });
+    });
+
+    return { groups, flat: groups.flatMap(g => g.zutaten || []) };
+  }
+
+  function recipeFromForm(existing, forcedId, isEdit) {
+    const z = readZutaten();
+
+    return {
+      // Beim Bearbeiten bestehende ID behalten.
+      // Bei neuem Rezept IMMER neue ID, damit kein Lösch-Duplikat entsteht.
+      id: isEdit ? (forcedId || existing?.id || newId()) : newId(),
+      name: $("nameInput")?.value?.trim() || "",
+      kategorie: $("kategorieInput")?.value || "Nicht zugeordnet",
+      portionen: $("portionenInput")?.value?.trim() || "",
+      schwierigkeit: $("schwierigkeitInput")?.value?.trim() || "",
+      zubereitungszeit: $("zubereitungszeitInput")?.value?.trim() || "",
+      quelle: $("quelleInput")?.value?.trim() || "",
+      tags: ($("tagsInput")?.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean),
+      zubereitung: $("zubereitungInput")?.value?.trim() || "",
+      utensilien: ($("utensilienInput")?.value || "").split(",").map(x => x.trim()).filter(Boolean),
+      notizen: $("notizenInput")?.value?.trim() || "",
+      naehrwerte: {
+        kalorien: $("kalorienInput")?.value?.trim() || "",
+        eiweiss: $("eiweissInput")?.value?.trim() || "",
+        kohlenhydrate: $("kohlenhydrateInput")?.value?.trim() || "",
+        fett: $("fettInput")?.value?.trim() || "",
+        zucker: $("zuckerInput")?.value?.trim() || "",
+        ballaststoffe: $("ballaststoffeInput")?.value?.trim() || "",
+        salz: $("salzInput")?.value?.trim() || ""
+      },
+      zutatenGruppen: z.groups,
+      zutaten: z.flat,
+      ausprobiert: $("ausprobiertInput") ? $("ausprobiertInput").value === "true" : (existing ? !!existing.ausprobiert : false),
+      favorit: existing ? !!existing.favorit : false,
+      bewertung: existing ? Number(existing.bewertung || 0) : 0,
+      erstelltAm: existing?.erstelltAm || new Date().toISOString(),
+      aktualisiertAm: new Date().toISOString()
+    };
+  }
+
+  function closeToStart() {
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    const ergebnisse = $("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      ergebnisse.hidden = true;
+      ergebnisse.style.display = "none";
+    }
+
+    document.body.classList.add("rf205-start");
+  }
+
+  function saveRecipeNoDuplicate() {
+    if (rf223Saving) return false;
+    rf223Saving = true;
+
+    try {
+      const list = loadList();
+      const edit = currentEdit();
+
+      let replaceIndex = -1;
+      if (edit.id) replaceIndex = list.findIndex(r => r && String(r.id) === String(edit.id));
+      if (replaceIndex < 0 && edit.index !== null && list[edit.index]) replaceIndex = edit.index;
+
+      const isEdit = replaceIndex >= 0;
+      const existing = isEdit ? list[replaceIndex] : null;
+      const recipe = recipeFromForm(existing, edit.id, isEdit);
+
+      if (!recipe.name) {
+        alert("Bitte einen Rezeptnamen eingeben.");
+        return false;
+      }
+
+      if (!recipe.zutaten.length) {
+        alert("Bitte mindestens eine Zutat eingeben.");
+        return false;
+      }
+
+      if (!recipe.zubereitung) {
+        alert("Bitte eine Zubereitung eingeben.");
+        return false;
+      }
+
+      if (isEdit) {
+        list[replaceIndex] = recipe;
+      } else {
+        list.push(recipe);
+      }
+
+      // Falls durch alte Handler doch ein Duplikat entstanden ist:
+      // gleiche IDs trennen, damit Löschen nie mehrere trifft.
+      const used = new Set();
+      list.forEach(r => {
+        if (!r.id) r.id = newId();
+        if (used.has(String(r.id))) r.id = newId();
+        used.add(String(r.id));
+      });
+
+      saveList(list);
+      clearEdit();
+
+      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+      if (typeof meldungAnzeigen === "function") meldungAnzeigen("Rezept gespeichert.");
+      else alert("Rezept gespeichert.");
+
+      closeToStart();
+
+      // Genau einmal Cloud-Upload nach Rezept speichern, falls vorhanden.
+      try {
+        if (typeof window.rf216AfterRecipeSaveUpload === "function") {
+          setTimeout(() => window.rf216AfterRecipeSaveUpload(), 800);
+        } else if (typeof window.rf217AfterRecipeSaveUpload === "function") {
+          setTimeout(() => window.rf217AfterRecipeSaveUpload(), 800);
+        }
+      } catch(e) {}
+
+      return true;
+    } finally {
+      setTimeout(() => { rf223Saving = false; }, 1000);
+    }
+  }
+
+  function deleteOne(index) {
+    const list = loadList();
+    const i = Number(index);
+
+    if (!Number.isInteger(i) || i < 0 || i >= list.length || !list[i]) {
+      alert("Rezept wurde nicht gefunden.");
+      return false;
+    }
+
+    const name = list[i].name || "dieses Rezept";
+    if (!confirm(`Möchtest du "${name}" wirklich löschen?`)) return false;
+
+    // Wichtig: exakt EIN Listenplatz, nicht alle mit gleicher ID.
+    list.splice(i, 1);
+    saveList(list);
+
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+    try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch(e) {}
+
+    if (typeof meldungAnzeigen === "function") meldungAnzeigen(`Rezept "${name}" gelöscht.`);
+    return true;
+  }
+
+  const oldEdit = window.rezeptBearbeiten;
+  window.rezeptBearbeiten = function(index) {
+    rememberEdit(index);
+    if (typeof window.rf212RezeptBearbeiten === "function") return window.rf212RezeptBearbeiten(index);
+    if (typeof oldEdit === "function" && oldEdit !== window.rezeptBearbeiten) return oldEdit(index);
+    return false;
+  };
+
+  window.rezeptLoeschen = deleteOne;
+  window.rf185DeleteOne = deleteOne;
+
+  window.rf223RezeptSpeichern = saveRecipeNoDuplicate;
+  window.rf214RezeptSpeichern = saveRecipeNoDuplicate;
+  window.rf213RezeptSpeichern = saveRecipeNoDuplicate;
+  window.rf212RezeptSpeichern = saveRecipeNoDuplicate;
+  window.rezeptSpeichern = saveRecipeNoDuplicate;
+  window.rezeptSpeichernDirektCloud = saveRecipeNoDuplicate;
+  window.rf155RezeptSpeichern = saveRecipeNoDuplicate;
+
+  try {
+    rezeptBearbeiten = window.rezeptBearbeiten;
+    rezeptLoeschen = deleteOne;
+    rezeptSpeichern = saveRecipeNoDuplicate;
+    rezeptSpeichernDirektCloud = saveRecipeNoDuplicate;
+    rf155RezeptSpeichern = saveRecipeNoDuplicate;
+  } catch(e) {}
+
+  function bindButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (
+        text === "rezept speichern" ||
+        text === "speichern" ||
+        onclick.includes("rezeptSpeichern") ||
+        onclick.includes("rf155RezeptSpeichern")
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return saveRecipeNoDuplicate();
+        };
+      }
+
+      if (text === "löschen" || onclick.includes("rezeptLoeschen")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          const attr = btn.getAttribute("onclick") || onclick;
+          const m = attr.match(/(\d+)/);
+          if (m) {
+            event.preventDefault();
+            event.stopPropagation();
+            return deleteOne(Number(m[1]));
+          }
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+
+    if (text === "rezept speichern" || text === "speichern") {
+      event.preventDefault();
+      event.stopPropagation();
+      return saveRecipeNoDuplicate();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    loadList();
+    bindButtons();
+    setTimeout(bindButtons, 300);
+    setTimeout(bindButtons, 1000);
+    setTimeout(bindButtons, 2000);
+  });
+})();
