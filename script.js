@@ -29177,32 +29177,15 @@ window.addEventListener("load", function () {
 
 
 // =====================================================
-// VERSION 2.23 Fix: Neue Rezepte doppelt + Löschen löscht beide
-// Ursache: gleiche IDs / mehrere Speicherhandler.
-// Fix:
-// - neuer Eintrag bekommt immer neue ID
-// - Bearbeiten ersetzt per gemerkter ID
-// - Duplikate mit gleicher ID werden getrennt
-// - Löschen löscht nur einen Listenplatz
+// VERSION 2.24 Fix: Rezept hinzufügen speichert genau einmal
+// Grundlage: funktionierende Speicherlogik bleibt erhalten.
+// Nach dem Speichern werden nur frisch entstandene Duplikate entfernt.
 // =====================================================
 
 (function () {
-  const EDIT_ID_KEY = "rf223_edit_id";
-  const EDIT_INDEX_KEY = "rf223_edit_index";
-  let rf223Saving = false;
+  let rf224Saving = false;
 
-  function $(id) {
-    return document.getElementById(id);
-  }
-
-  function newId() {
-    try {
-      if (crypto && crypto.randomUUID) return crypto.randomUUID();
-    } catch(e) {}
-    return "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
-  }
-
-  function loadList() {
+  function rf224Load() {
     let list = [];
     try {
       list = JSON.parse(localStorage.getItem("rezepte") || "[]");
@@ -29212,231 +29195,145 @@ window.addEventListener("load", function () {
 
     if (!Array.isArray(list)) list = [];
 
-    // Wichtig: gleiche IDs trennen, statt gleiche IDs beizubehalten.
-    const used = new Set();
-    list.forEach(r => {
-      if (!r) return;
-      if (!r.id) r.id = newId();
-      if (used.has(String(r.id))) {
-        r.id = newId();
-        r.aktualisiertAm = new Date().toISOString();
-      }
-      used.add(String(r.id));
-    });
-
     window.rezepte = list;
     try { rezepte = list; } catch(e) {}
-    localStorage.setItem("rezepte", JSON.stringify(list));
     return list;
   }
 
-  function saveList(list) {
+  function rf224Save(list) {
     window.rezepte = list;
     try { rezepte = list; } catch(e) {}
     localStorage.setItem("rezepte", JSON.stringify(list));
   }
 
-  function rememberEdit(index) {
-    const list = loadList();
-    const i = Number(index);
-
-    if (Number.isInteger(i) && i >= 0 && i < list.length && list[i]) {
-      if (!list[i].id) list[i].id = newId();
-      sessionStorage.setItem(EDIT_ID_KEY, String(list[i].id));
-      sessionStorage.setItem(EDIT_INDEX_KEY, String(i));
-      window.bearbeitungsIndex = i;
-      try { bearbeitungsIndex = i; } catch(e) {}
-      saveList(list);
-      return true;
-    }
-
-    sessionStorage.removeItem(EDIT_ID_KEY);
-    sessionStorage.removeItem(EDIT_INDEX_KEY);
-    return false;
+  function rf224Id() {
+    try {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch(e) {}
+    return "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
   }
 
-  function clearEdit() {
-    sessionStorage.removeItem(EDIT_ID_KEY);
-    sessionStorage.removeItem(EDIT_INDEX_KEY);
-    window.bearbeitungsIndex = null;
-    try { bearbeitungsIndex = null; } catch(e) {}
+  function rf224Sig(recipe) {
+    if (!recipe) return "";
+    const zutaten = JSON.stringify(recipe.zutaten || recipe.zutatenGruppen || []);
+    return [
+      String(recipe.name || "").trim().toLowerCase(),
+      String(recipe.kategorie || "").trim().toLowerCase(),
+      String(recipe.portionen || "").trim(),
+      String(recipe.zubereitung || "").trim().toLowerCase(),
+      zutaten
+    ].join("|");
   }
 
-  function currentEdit() {
-    const id = sessionStorage.getItem(EDIT_ID_KEY) || "";
-    const raw = sessionStorage.getItem(EDIT_INDEX_KEY);
-    const index = raw !== null && raw !== "" ? Number(raw) : null;
-    return { id, index: Number.isInteger(index) ? index : null };
-  }
+  function rf224CleanupFreshDuplicates(beforeLength) {
+    let list = rf224Load();
 
-  function readZutaten() {
-    const groups = [];
-    const container = $("zutatenGruppen");
-
-    if (!container) return { groups, flat: [] };
-
-    Array.from(container.querySelectorAll(".zutatengruppe")).forEach((gruppe, gi) => {
-      const groupNameEl = gruppe.querySelector(".zutaten-gruppenname");
-      const groupName = groupNameEl && groupNameEl.value.trim()
-        ? groupNameEl.value.trim()
-        : (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1));
-
-      const zutaten = [];
-
-      Array.from(gruppe.querySelectorAll(".zutaten-zeile, .zutat-zeile")).forEach(row => {
-        const menge = row.querySelector(".zutat-menge")?.value?.trim() || "";
-        const einheit = row.querySelector(".zutat-einheit")?.value?.trim() || "";
-        const name = row.querySelector(".zutat-name")?.value?.trim() || "";
-        if (menge || einheit || name) zutaten.push({ menge, einheit, name });
-      });
-
-      if (zutaten.length) groups.push({ name: groupName, zutaten });
-    });
-
-    return { groups, flat: groups.flatMap(g => g.zutaten || []) };
-  }
-
-  function recipeFromForm(existing, forcedId, isEdit) {
-    const z = readZutaten();
-
-    return {
-      // Beim Bearbeiten bestehende ID behalten.
-      // Bei neuem Rezept IMMER neue ID, damit kein Lösch-Duplikat entsteht.
-      id: isEdit ? (forcedId || existing?.id || newId()) : newId(),
-      name: $("nameInput")?.value?.trim() || "",
-      kategorie: $("kategorieInput")?.value || "Nicht zugeordnet",
-      portionen: $("portionenInput")?.value?.trim() || "",
-      schwierigkeit: $("schwierigkeitInput")?.value?.trim() || "",
-      zubereitungszeit: $("zubereitungszeitInput")?.value?.trim() || "",
-      quelle: $("quelleInput")?.value?.trim() || "",
-      tags: ($("tagsInput")?.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean),
-      zubereitung: $("zubereitungInput")?.value?.trim() || "",
-      utensilien: ($("utensilienInput")?.value || "").split(",").map(x => x.trim()).filter(Boolean),
-      notizen: $("notizenInput")?.value?.trim() || "",
-      naehrwerte: {
-        kalorien: $("kalorienInput")?.value?.trim() || "",
-        eiweiss: $("eiweissInput")?.value?.trim() || "",
-        kohlenhydrate: $("kohlenhydrateInput")?.value?.trim() || "",
-        fett: $("fettInput")?.value?.trim() || "",
-        zucker: $("zuckerInput")?.value?.trim() || "",
-        ballaststoffe: $("ballaststoffeInput")?.value?.trim() || "",
-        salz: $("salzInput")?.value?.trim() || ""
-      },
-      zutatenGruppen: z.groups,
-      zutaten: z.flat,
-      ausprobiert: $("ausprobiertInput") ? $("ausprobiertInput").value === "true" : (existing ? !!existing.ausprobiert : false),
-      favorit: existing ? !!existing.favorit : false,
-      bewertung: existing ? Number(existing.bewertung || 0) : 0,
-      erstelltAm: existing?.erstelltAm || new Date().toISOString(),
-      aktualisiertAm: new Date().toISOString()
-    };
-  }
-
-  function closeToStart() {
-    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
-      const el = $(id);
-      if (el) {
-        el.hidden = true;
-        el.style.display = "none";
-        el.classList.add("versteckt");
+    // 1) Fehlende/gleiche IDs reparieren, aber nicht dadurch zwei gleiche Rezepte löschen.
+    const usedIds = new Set();
+    list.forEach(r => {
+      if (!r) return;
+      if (!r.id) r.id = rf224Id();
+      if (usedIds.has(String(r.id))) {
+        r.id = rf224Id();
+        r.aktualisiertAm = new Date().toISOString();
       }
+      usedIds.add(String(r.id));
     });
 
-    const ergebnisse = $("ergebnisse");
-    if (ergebnisse) {
-      ergebnisse.innerHTML = "";
-      ergebnisse.hidden = true;
-      ergebnisse.style.display = "none";
-    }
+    // 2) Wenn beim letzten Speichern exakt derselbe Inhalt mehrfach neu angehängt wurde:
+    // nur eine Kopie behalten.
+    const seen = new Map();
+    const cleaned = [];
 
-    document.body.classList.add("rf205-start");
+    list.forEach((r, idx) => {
+      const sig = rf224Sig(r);
+      const prevIndex = seen.get(sig);
+
+      if (
+        sig &&
+        prevIndex !== undefined &&
+        idx >= beforeLength &&
+        prevIndex >= beforeLength
+      ) {
+        // beide sind neu aus demselben Speichervorgang -> zweite Kopie entfernen
+        return;
+      }
+
+      seen.set(sig, idx);
+      cleaned.push(r);
+    });
+
+    rf224Save(cleaned);
+
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+    return cleaned;
   }
 
-  function saveRecipeNoDuplicate() {
-    if (rf223Saving) return false;
-    rf223Saving = true;
+  // alte funktionierende Speicherfunktion sichern
+  const oldSave224 =
+    window.rezeptSpeichern ||
+    window.rf155RezeptSpeichern ||
+    window.rezeptSpeichernDirektCloud;
+
+  function rf224SaveOnce() {
+    if (rf224Saving) return false;
+
+    rf224Saving = true;
+    const before = rf224Load().length;
 
     try {
-      const list = loadList();
-      const edit = currentEdit();
+      let result = true;
 
-      let replaceIndex = -1;
-      if (edit.id) replaceIndex = list.findIndex(r => r && String(r.id) === String(edit.id));
-      if (replaceIndex < 0 && edit.index !== null && list[edit.index]) replaceIndex = edit.index;
-
-      const isEdit = replaceIndex >= 0;
-      const existing = isEdit ? list[replaceIndex] : null;
-      const recipe = recipeFromForm(existing, edit.id, isEdit);
-
-      if (!recipe.name) {
-        alert("Bitte einen Rezeptnamen eingeben.");
-        return false;
-      }
-
-      if (!recipe.zutaten.length) {
-        alert("Bitte mindestens eine Zutat eingeben.");
-        return false;
-      }
-
-      if (!recipe.zubereitung) {
-        alert("Bitte eine Zubereitung eingeben.");
-        return false;
-      }
-
-      if (isEdit) {
-        list[replaceIndex] = recipe;
+      if (typeof oldSave224 === "function" && oldSave224 !== rf224SaveOnce) {
+        result = oldSave224.apply(this, arguments);
+      } else if (typeof window.rf212RezeptSpeichern === "function") {
+        result = window.rf212RezeptSpeichern();
       } else {
-        list.push(recipe);
+        alert("Speicherfunktion wurde nicht gefunden.");
+        return false;
       }
 
-      // Falls durch alte Handler doch ein Duplikat entstanden ist:
-      // gleiche IDs trennen, damit Löschen nie mehrere trifft.
-      const used = new Set();
-      list.forEach(r => {
-        if (!r.id) r.id = newId();
-        if (used.has(String(r.id))) r.id = newId();
-        used.add(String(r.id));
-      });
+      setTimeout(() => {
+        rf224CleanupFreshDuplicates(before);
+      }, 250);
 
-      saveList(list);
-      clearEdit();
+      setTimeout(() => {
+        rf224CleanupFreshDuplicates(before);
+      }, 900);
 
-      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
-      if (typeof meldungAnzeigen === "function") meldungAnzeigen("Rezept gespeichert.");
-      else alert("Rezept gespeichert.");
-
-      closeToStart();
-
-      // Genau einmal Cloud-Upload nach Rezept speichern, falls vorhanden.
-      try {
-        if (typeof window.rf216AfterRecipeSaveUpload === "function") {
-          setTimeout(() => window.rf216AfterRecipeSaveUpload(), 800);
-        } else if (typeof window.rf217AfterRecipeSaveUpload === "function") {
-          setTimeout(() => window.rf217AfterRecipeSaveUpload(), 800);
-        }
-      } catch(e) {}
-
-      return true;
+      return result;
     } finally {
-      setTimeout(() => { rf223Saving = false; }, 1000);
+      setTimeout(() => {
+        rf224Saving = false;
+      }, 1200);
     }
   }
 
-  function deleteOne(index) {
-    const list = loadList();
+  window.rf224SaveOnce = rf224SaveOnce;
+  window.rezeptSpeichern = rf224SaveOnce;
+  window.rezeptSpeichernDirektCloud = rf224SaveOnce;
+  window.rf155RezeptSpeichern = rf224SaveOnce;
+
+  try {
+    rezeptSpeichern = rf224SaveOnce;
+    rezeptSpeichernDirektCloud = rf224SaveOnce;
+    rf155RezeptSpeichern = rf224SaveOnce;
+  } catch(e) {}
+
+  function rf224DeleteOne(index) {
+    const list = rf224Load();
     const i = Number(index);
 
-    if (!Number.isInteger(i) || i < 0 || i >= list.length || !list[i]) {
+    if (!Number.isInteger(i) || i < 0 || i >= list.length) {
       alert("Rezept wurde nicht gefunden.");
       return false;
     }
 
-    const name = list[i].name || "dieses Rezept";
+    const name = list[i]?.name || "dieses Rezept";
     if (!confirm(`Möchtest du "${name}" wirklich löschen?`)) return false;
 
-    // Wichtig: exakt EIN Listenplatz, nicht alle mit gleicher ID.
     list.splice(i, 1);
-    saveList(list);
+    rf224Save(list);
 
     try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
     try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch(e) {}
@@ -29445,34 +29342,10 @@ window.addEventListener("load", function () {
     return true;
   }
 
-  const oldEdit = window.rezeptBearbeiten;
-  window.rezeptBearbeiten = function(index) {
-    rememberEdit(index);
-    if (typeof window.rf212RezeptBearbeiten === "function") return window.rf212RezeptBearbeiten(index);
-    if (typeof oldEdit === "function" && oldEdit !== window.rezeptBearbeiten) return oldEdit(index);
-    return false;
-  };
+  window.rezeptLoeschen = rf224DeleteOne;
+  try { rezeptLoeschen = rf224DeleteOne; } catch(e) {}
 
-  window.rezeptLoeschen = deleteOne;
-  window.rf185DeleteOne = deleteOne;
-
-  window.rf223RezeptSpeichern = saveRecipeNoDuplicate;
-  window.rf214RezeptSpeichern = saveRecipeNoDuplicate;
-  window.rf213RezeptSpeichern = saveRecipeNoDuplicate;
-  window.rf212RezeptSpeichern = saveRecipeNoDuplicate;
-  window.rezeptSpeichern = saveRecipeNoDuplicate;
-  window.rezeptSpeichernDirektCloud = saveRecipeNoDuplicate;
-  window.rf155RezeptSpeichern = saveRecipeNoDuplicate;
-
-  try {
-    rezeptBearbeiten = window.rezeptBearbeiten;
-    rezeptLoeschen = deleteOne;
-    rezeptSpeichern = saveRecipeNoDuplicate;
-    rezeptSpeichernDirektCloud = saveRecipeNoDuplicate;
-    rf155RezeptSpeichern = saveRecipeNoDuplicate;
-  } catch(e) {}
-
-  function bindButtons() {
+  function rf224Bind() {
     document.querySelectorAll("button").forEach(btn => {
       const text = (btn.textContent || "").trim().toLowerCase();
       const onclick = btn.getAttribute("onclick") || "";
@@ -29489,7 +29362,7 @@ window.addEventListener("load", function () {
             event.preventDefault();
             event.stopPropagation();
           }
-          return saveRecipeNoDuplicate();
+          return rf224SaveOnce();
         };
       }
 
@@ -29501,7 +29374,7 @@ window.addEventListener("load", function () {
           if (m) {
             event.preventDefault();
             event.stopPropagation();
-            return deleteOne(Number(m[1]));
+            return rf224DeleteOne(Number(m[1]));
           }
         };
       }
@@ -29517,15 +29390,15 @@ window.addEventListener("load", function () {
     if (text === "rezept speichern" || text === "speichern") {
       event.preventDefault();
       event.stopPropagation();
-      return saveRecipeNoDuplicate();
+      return rf224SaveOnce();
     }
   }, true);
 
   window.addEventListener("load", function() {
-    loadList();
-    bindButtons();
-    setTimeout(bindButtons, 300);
-    setTimeout(bindButtons, 1000);
-    setTimeout(bindButtons, 2000);
+    rf224Load();
+    rf224Bind();
+    setTimeout(rf224Bind, 300);
+    setTimeout(rf224Bind, 1000);
+    setTimeout(rf224Bind, 2000);
   });
 })();
