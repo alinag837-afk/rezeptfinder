@@ -32217,3 +32217,285 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.39 Zutaten-Löschen Button wiederherstellen
+// =====================================================
+
+(function () {
+
+  function addDeleteButtons239() {
+    document.querySelectorAll("#zutatenGruppen .zutaten-zeile, #zutatenGruppen .zutat-zeile").forEach(row => {
+
+      if (row.querySelector(".rf239-zutat-loeschen")) return;
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "rf239-zutat-loeschen";
+      button.textContent = "🗑";
+
+      button.style.marginLeft = "8px";
+
+      button.onclick = function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const rowsContainer =
+          row.parentElement?.closest(".zutaten-zeilen") ||
+          row.parentElement;
+
+        row.remove();
+
+        // Leere Gruppen automatisch entfernen (außer erste Gruppe)
+        document.querySelectorAll("#zutatenGruppen .zutatengruppe").forEach((group, index) => {
+          const rows = group.querySelectorAll(".zutaten-zeile, .zutat-zeile");
+          if (!rows.length && index > 0) {
+            group.remove();
+          }
+        });
+
+        return false;
+      };
+
+      row.appendChild(button);
+    });
+  }
+
+  // Auch bei dynamisch hinzugefügten Zutaten aktiv
+  const observer239 = new MutationObserver(() => {
+    addDeleteButtons239();
+  });
+
+  window.addEventListener("load", function() {
+    addDeleteButtons239();
+
+    const container = document.getElementById("zutatenGruppen");
+    if (container) {
+      observer239.observe(container, {
+        childList: true,
+        subtree: true
+      });
+    }
+
+    setTimeout(addDeleteButtons239, 300);
+    setTimeout(addDeleteButtons239, 1000);
+  });
+
+})();
+
+
+
+// =====================================================
+// VERSION 2.40 Fix: "Aus Cloud laden" funktioniert wieder
+// Lädt aus Supabase, speichert lokal und aktualisiert die Übersicht.
+// =====================================================
+
+(function () {
+  let rf240CloudLoadBusy = false;
+
+  function rf240Status(text, error) {
+    try {
+      if (typeof cloudStatus === "function") {
+        cloudStatus(text, !!error);
+        return;
+      }
+    } catch(e) {}
+
+    const el = document.getElementById("cloudStatus");
+    if (el) el.textContent = text;
+    console.log(text);
+  }
+
+  function rf240Client() {
+    try {
+      if (typeof cloudInit === "function") cloudInit();
+    } catch(e) {}
+
+    const client =
+      window.supabaseClient ||
+      (typeof supabaseClient !== "undefined" ? supabaseClient : null);
+
+    if (!client) {
+      throw new Error("Supabase ist nicht verbunden.");
+    }
+
+    return client;
+  }
+
+  function rf240MakeId() {
+    try {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch(e) {}
+    return "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function rf240Normalize(list) {
+    if (!Array.isArray(list)) list = [];
+
+    const ids = new Set();
+    const out = [];
+
+    list.forEach(r => {
+      if (!r || typeof r !== "object") return;
+      if (r.geloescht || r.deleted || r.__deleted || r.id === "__rezeptfinder_deleted_keys__") return;
+
+      if (!r.id) r.id = rf240MakeId();
+
+      if (ids.has(String(r.id))) {
+        r.id = rf240MakeId();
+      }
+
+      ids.add(String(r.id));
+      out.push(r);
+    });
+
+    return out;
+  }
+
+  function rf240SaveLocal(list) {
+    list = rf240Normalize(list);
+
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    localStorage.setItem("rezepte_rf235_sicherung", JSON.stringify(list));
+
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+
+    return list;
+  }
+
+  async function rf240CloudLaden() {
+    if (rf240CloudLoadBusy) {
+      rf240Status("Cloud-Laden läuft bereits ...");
+      return false;
+    }
+
+    rf240CloudLoadBusy = true;
+
+    try {
+      const client = rf240Client();
+
+      rf240Status("lade Rezepte aus Cloud ...");
+
+      const { data, error } = await client
+        .from("rezepte")
+        .select("*");
+
+      if (error) throw error;
+
+      const rows = Array.isArray(data) ? data : [];
+
+      const recipes = rows
+        .filter(row => row && row.id !== "__rezeptfinder_deleted_keys__")
+        .map(row => {
+          if (row.daten && typeof row.daten === "object") {
+            return { ...row.daten, id: row.daten.id || row.id };
+          }
+
+          // Fallback für ältere Cloud-Struktur
+          if (row.rezept && typeof row.rezept === "object") {
+            return { ...row.rezept, id: row.rezept.id || row.id };
+          }
+
+          return {
+            id: row.id || rf240MakeId(),
+            name: row.name || "Unbenanntes Rezept",
+            kategorie: row.kategorie || "Nicht zugeordnet",
+            zutaten: row.zutaten || [],
+            zutatenGruppen: row.zutatenGruppen || [],
+            zubereitung: row.zubereitung || "",
+            quelle: row.quelle || "",
+            portionen: row.portionen || ""
+          };
+        });
+
+      const saved = rf240SaveLocal(recipes);
+
+      try {
+        if (typeof dashboardAktualisieren === "function") dashboardAktualisieren();
+      } catch(e) {}
+
+      try {
+        if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren();
+      } catch(e) {}
+
+      rf240Status(saved.length + " Rezept(e) aus Cloud geladen.");
+
+      if (typeof meldungAnzeigen === "function") {
+        meldungAnzeigen(saved.length + " Rezept(e) aus Cloud geladen.");
+      } else {
+        alert(saved.length + " Rezept(e) aus Cloud geladen.");
+      }
+
+      return true;
+    } catch(e) {
+      console.error("Cloud-Laden v2.40 Fehler:", e);
+      rf240Status("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      setTimeout(() => {
+        rf240CloudLoadBusy = false;
+      }, 1200);
+    }
+  }
+
+  window.rf240CloudLaden = rf240CloudLaden;
+  window.cloudLaden = rf240CloudLaden;
+  window.ausCloudLaden = rf240CloudLaden;
+  window.cloudHerunterladen = rf240CloudLaden;
+  window.rf177CloudLoadButton = rf240CloudLaden;
+
+  try {
+    cloudLaden = rf240CloudLaden;
+    ausCloudLaden = rf240CloudLaden;
+    cloudHerunterladen = rf240CloudLaden;
+  } catch(e) {}
+
+  function rf240BindCloudLoadButton() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (
+        text === "aus cloud laden" ||
+        text.includes("cloud laden") ||
+        onclick.includes("cloudLaden") ||
+        onclick.includes("ausCloudLaden") ||
+        onclick.includes("cloudHerunterladen")
+      ) {
+        btn.type = "button";
+        btn.removeAttribute("onclick");
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf240CloudLaden();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+
+    if (text === "aus cloud laden" || text.includes("cloud laden")) {
+      event.preventDefault();
+      event.stopPropagation();
+      return rf240CloudLaden();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    rf240BindCloudLoadButton();
+    setTimeout(rf240BindCloudLoadButton, 300);
+    setTimeout(rf240BindCloudLoadButton, 1000);
+    setTimeout(rf240BindCloudLoadButton, 2000);
+  });
+})();
