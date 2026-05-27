@@ -28336,3 +28336,170 @@ window.addEventListener("load", function () {
     setTimeout(rf217BindButtons, 1500);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.18 Fix: Cloud-Backups einklappen
+// Zweiter Klick auf "Cloud-Backups anzeigen"
+// klappt die Liste wieder ein.
+// =====================================================
+
+(function () {
+  let rf218BackupOpen = false;
+
+  function rf218FindBackupContainer() {
+    const ids = [
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups",
+      "backupBereich"
+    ];
+
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) return el;
+    }
+
+    const candidates = Array.from(document.querySelectorAll("div, section"));
+    return candidates.find(el => {
+      const txt = (el.textContent || "").toLowerCase();
+      return txt.includes("backup") && el.querySelector("button");
+    }) || null;
+  }
+
+  function rf218ToggleBackups() {
+    const container = rf218FindBackupContainer();
+
+    // Falls sichtbar -> einklappen
+    if (rf218BackupOpen && container) {
+      container.style.display = "none";
+      container.hidden = true;
+      container.classList.add("versteckt");
+      rf218BackupOpen = false;
+      return false;
+    }
+
+    // Sonst normale Originalfunktion starten
+    let opened = false;
+
+    const funcs = [
+      "cloudBackupsAnzeigen",
+      "zeigeCloudBackups",
+      "backupsAnzeigen",
+      "cloudBackupAnzeigen"
+    ];
+
+    for (const name of funcs) {
+      try {
+        const fn = window[name];
+        if (typeof fn === "function" && fn !== rf218ToggleBackups) {
+          fn();
+          opened = true;
+          break;
+        }
+      } catch(e) {
+        console.error(e);
+      }
+    }
+
+    // Falls keine Funktion gefunden wurde, Container einfach sichtbar machen
+    const c = rf218FindBackupContainer();
+    if (c) {
+      c.style.display = "";
+      c.hidden = false;
+      c.classList.remove("versteckt");
+      rf218BackupOpen = true;
+    }
+
+    return opened;
+  }
+
+  // Originalfunktionen sichern
+  [
+    "cloudBackupsAnzeigen",
+    "zeigeCloudBackups",
+    "backupsAnzeigen",
+    "cloudBackupAnzeigen"
+  ].forEach(name => {
+    try {
+      if (typeof window[name] === "function" && !window[name + "_original"]) {
+        window[name + "_original"] = window[name];
+      }
+    } catch(e) {}
+  });
+
+  // Neue Togglefunktion global setzen
+  window.rf218ToggleBackups = rf218ToggleBackups;
+
+  // Wrapper mit Toggle-Verhalten
+  function rf218Wrap(name) {
+    window[name] = function() {
+      if (rf218BackupOpen) {
+        const container = rf218FindBackupContainer();
+        if (container) {
+          container.style.display = "none";
+          container.hidden = true;
+          container.classList.add("versteckt");
+        }
+        rf218BackupOpen = false;
+        return false;
+      }
+
+      const orig = window[name + "_original"];
+      if (typeof orig === "function") {
+        const result = orig.apply(this, arguments);
+
+        setTimeout(() => {
+          const c = rf218FindBackupContainer();
+          if (c) {
+            c.style.display = "";
+            c.hidden = false;
+            c.classList.remove("versteckt");
+            rf218BackupOpen = true;
+          }
+        }, 200);
+
+        return result;
+      }
+
+      return rf218ToggleBackups();
+    };
+  }
+
+  [
+    "cloudBackupsAnzeigen",
+    "zeigeCloudBackups",
+    "backupsAnzeigen",
+    "cloudBackupAnzeigen"
+  ].forEach(rf218Wrap);
+
+  function rf218BindButton() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (
+        text === "cloud-backups anzeigen" ||
+        text === "cloud backups anzeigen" ||
+        text.includes("backup")
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf218ToggleBackups();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    rf218BindButton();
+    setTimeout(rf218BindButton, 500);
+    setTimeout(rf218BindButton, 1500);
+  });
+})();
