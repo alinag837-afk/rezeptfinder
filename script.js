@@ -32499,3 +32499,257 @@ window.addEventListener("load", function () {
     setTimeout(rf240BindCloudLoadButton, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.41 Fix:
+// 1) Zutaten-Löschen Button nur einmal pro Zeile
+// 2) automatische Nährwert-Tags beim Speichern wieder ergänzen
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function normalizeTag(tag) {
+    return String(tag || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-");
+  }
+
+  function numberFrom(id) {
+    const el = $(id);
+    if (!el) return null;
+    const raw = String(el.value || "").replace(",", ".").trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function autoNutritionTagsFromForm() {
+    const tags = [];
+
+    const kcal = numberFrom("kalorienInput");
+    const protein = numberFrom("eiweissInput");
+    const carbs = numberFrom("kohlenhydrateInput");
+    const fat = numberFrom("fettInput");
+    const sugar = numberFrom("zuckerInput");
+    const salt = numberFrom("salzInput");
+
+    if (kcal !== null) {
+      if (kcal <= 100) tags.push("kalorienarm");
+      if (kcal >= 300) tags.push("kalorienreich");
+    }
+
+    if (protein !== null) {
+      if (protein < 5) tags.push("proteinarm");
+      if (protein >= 12) tags.push("proteinreich");
+    }
+
+    if (carbs !== null) {
+      if (carbs < 10) tags.push("kohlenhydratarm");
+      if (carbs >= 30) tags.push("kohlenhydratreich");
+    }
+
+    if (fat !== null) {
+      if (fat < 5) tags.push("fettarm");
+      if (fat >= 20) tags.push("fettreich");
+    }
+
+    if (sugar !== null) {
+      if (sugar < 5) tags.push("zuckerarm");
+      if (sugar >= 15) tags.push("zuckerreich");
+    }
+
+    if (salt !== null) {
+      if (salt < 0.3) tags.push("salzarm");
+      if (salt >= 1.5) tags.push("salzreich");
+    }
+
+    return tags;
+  }
+
+  function applyAutoNutritionTagsToInput() {
+    const input = $("tagsInput");
+    if (!input) return;
+
+    const existing = String(input.value || "")
+      .split(",")
+      .map(normalizeTag)
+      .filter(Boolean);
+
+    // Alte automatische Nährwert-Tags entfernen, damit sie nach Änderungen korrekt neu gesetzt werden.
+    const autoPrefixes = new Set([
+      "kalorienarm", "kalorienreich",
+      "proteinarm", "proteinreich",
+      "kohlenhydratarm", "kohlenhydratreich",
+      "fettarm", "fettreich",
+      "zuckerarm", "zuckerreich",
+      "salzarm", "salzreich"
+    ]);
+
+    const manual = existing.filter(t => !autoPrefixes.has(t));
+    const automatic = autoNutritionTagsFromForm().map(normalizeTag);
+
+    const merged = [...new Set([...manual, ...automatic])];
+    input.value = merged.join(", ");
+  }
+
+  function cleanIngredientDeleteButtons() {
+    document.querySelectorAll("#zutatenGruppen .zutaten-zeile, #zutatenGruppen .zutat-zeile").forEach(row => {
+      const buttons = Array.from(row.querySelectorAll(".rf239-zutat-loeschen, .rf241-zutat-loeschen"));
+
+      // Alle alten/doppelten Buttons entfernen
+      buttons.forEach(btn => btn.remove());
+
+      // Genau einen neuen Button setzen
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "rf241-zutat-loeschen";
+      btn.textContent = "🗑";
+      btn.title = "Zutat löschen";
+
+      btn.onclick = function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const group = row.closest(".zutatengruppe");
+        row.remove();
+
+        if (group) {
+          const remaining = group.querySelectorAll(".zutaten-zeile, .zutat-zeile");
+          const allGroups = Array.from(document.querySelectorAll("#zutatenGruppen .zutatengruppe"));
+
+          // Leere Zusatzgruppen entfernen, erste Gruppe bleibt.
+          if (!remaining.length && allGroups.indexOf(group) > 0) {
+            group.remove();
+          }
+        }
+
+        return false;
+      };
+
+      row.appendChild(btn);
+    });
+  }
+
+  // Alte v2.39 Buttons bei jedem DOM-Update bereinigen.
+  let cleanupScheduled = false;
+  function scheduleCleanup() {
+    if (cleanupScheduled) return;
+    cleanupScheduled = true;
+    setTimeout(() => {
+      cleanupScheduled = false;
+      cleanIngredientDeleteButtons();
+    }, 50);
+  }
+
+  const containerReady = function() {
+    const container = $("zutatenGruppen");
+    if (!container || container.dataset.rf241Observer === "1") return;
+
+    container.dataset.rf241Observer = "1";
+
+    const observer = new MutationObserver(scheduleCleanup);
+    observer.observe(container, { childList: true, subtree: true });
+
+    cleanIngredientDeleteButtons();
+  };
+
+  // Speichern absichern: Tags direkt vor dem Speichern ergänzen.
+  const oldSave241 =
+    window.rf235Save ||
+    window.rezeptSpeichern ||
+    window.rf155RezeptSpeichern;
+
+  function saveWithNutritionTags() {
+    applyAutoNutritionTagsToInput();
+
+    if (typeof oldSave241 === "function" && oldSave241 !== saveWithNutritionTags) {
+      return oldSave241.apply(this, arguments);
+    }
+
+    if (typeof window.rf234RezeptSpeichern === "function") {
+      return window.rf234RezeptSpeichern.apply(this, arguments);
+    }
+
+    alert("Speicherfunktion wurde nicht gefunden.");
+    return false;
+  }
+
+  window.rf241SaveWithNutritionTags = saveWithNutritionTags;
+  window.rezeptSpeichern = saveWithNutritionTags;
+  window.rf155RezeptSpeichern = saveWithNutritionTags;
+  window.rezeptSpeichernDirektCloud = saveWithNutritionTags;
+
+  try {
+    rezeptSpeichern = saveWithNutritionTags;
+    rf155RezeptSpeichern = saveWithNutritionTags;
+    rezeptSpeichernDirektCloud = saveWithNutritionTags;
+  } catch(e) {}
+
+  function bind241() {
+    containerReady();
+    cleanIngredientDeleteButtons();
+
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+      const onclick = button.getAttribute("onclick") || "";
+
+      if (
+        text === "rezept speichern" ||
+        text === "speichern" ||
+        onclick.includes("rezeptSpeichern") ||
+        onclick.includes("rf155RezeptSpeichern")
+      ) {
+        button.type = "button";
+        button.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+          }
+          return saveWithNutritionTags();
+        };
+      }
+    });
+
+    ["kalorienInput", "eiweissInput", "kohlenhydrateInput", "fettInput", "zuckerInput", "salzInput"].forEach(id => {
+      const el = $(id);
+      if (el && el.dataset.rf241TagsBound !== "1") {
+        el.dataset.rf241TagsBound = "1";
+        el.addEventListener("change", applyAutoNutritionTagsToInput);
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+
+    const text = (button.textContent || "").trim().toLowerCase();
+
+    if (text === "rezept speichern" || text === "speichern") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      event.stopPropagation();
+      return saveWithNutritionTags();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    bind241();
+    setTimeout(bind241, 300);
+    setTimeout(bind241, 1000);
+    setTimeout(bind241, 2000);
+  });
+
+  window.rf241Diagnose = function() {
+    return {
+      loeschButtons: document.querySelectorAll("#zutatenGruppen .rf241-zutat-loeschen").length,
+      alteLoeschButtons: document.querySelectorAll("#zutatenGruppen .rf239-zutat-loeschen").length,
+      tags: $("tagsInput") ? $("tagsInput").value : ""
+    };
+  };
+})();
