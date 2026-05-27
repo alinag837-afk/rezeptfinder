@@ -29402,3 +29402,299 @@ window.addEventListener("load", function () {
     setTimeout(rf224Bind, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.25 HARD FIX: Rezept speichern genau EINMAL
+// Mehrere alte Speicherhandler werden pro Klick komplett blockiert.
+// =====================================================
+
+(function () {
+  let rf225Saving = false;
+  let rf225LastSaveAt = 0;
+  let rf225EditIndex = null;
+
+  function $(id) { return document.getElementById(id); }
+
+  function id225() {
+    try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch(e) {}
+    return "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function load225() {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem("rezepte") || "[]"); } catch(e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+    return list;
+  }
+
+  function save225(list) {
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+    localStorage.setItem("rezepte", JSON.stringify(list));
+  }
+
+  function readZutaten225() {
+    const groups = [];
+    const container = $("zutatenGruppen");
+    if (!container) return { groups, flat: [] };
+
+    Array.from(container.querySelectorAll(".zutatengruppe")).forEach((gruppe, gi) => {
+      const groupNameEl = gruppe.querySelector(".zutaten-gruppenname");
+      const groupName = groupNameEl && groupNameEl.value.trim()
+        ? groupNameEl.value.trim()
+        : (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1));
+
+      const zutaten = [];
+      Array.from(gruppe.querySelectorAll(".zutaten-zeile, .zutat-zeile")).forEach(row => {
+        const menge = row.querySelector(".zutat-menge")?.value?.trim() || "";
+        const einheit = row.querySelector(".zutat-einheit")?.value?.trim() || "";
+        const name = row.querySelector(".zutat-name")?.value?.trim() || "";
+        if (menge || einheit || name) zutaten.push({ menge, einheit, name });
+      });
+
+      if (zutaten.length) groups.push({ name: groupName, zutaten });
+    });
+
+    return { groups, flat: groups.flatMap(g => g.zutaten || []) };
+  }
+
+  function recipeFromForm225(existing, isEdit) {
+    const z = readZutaten225();
+
+    return {
+      id: isEdit && existing?.id ? existing.id : id225(),
+      name: $("nameInput")?.value?.trim() || "",
+      kategorie: $("kategorieInput")?.value || "Nicht zugeordnet",
+      portionen: $("portionenInput")?.value?.trim() || "",
+      schwierigkeit: $("schwierigkeitInput")?.value?.trim() || "",
+      zubereitungszeit: $("zubereitungszeitInput")?.value?.trim() || "",
+      quelle: $("quelleInput")?.value?.trim() || "",
+      tags: ($("tagsInput")?.value || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean),
+      zubereitung: $("zubereitungInput")?.value?.trim() || "",
+      utensilien: ($("utensilienInput")?.value || "").split(",").map(x => x.trim()).filter(Boolean),
+      notizen: $("notizenInput")?.value?.trim() || "",
+      naehrwerte: {
+        kalorien: $("kalorienInput")?.value?.trim() || "",
+        eiweiss: $("eiweissInput")?.value?.trim() || "",
+        kohlenhydrate: $("kohlenhydrateInput")?.value?.trim() || "",
+        fett: $("fettInput")?.value?.trim() || "",
+        zucker: $("zuckerInput")?.value?.trim() || "",
+        ballaststoffe: $("ballaststoffeInput")?.value?.trim() || "",
+        salz: $("salzInput")?.value?.trim() || ""
+      },
+      zutatenGruppen: z.groups,
+      zutaten: z.flat,
+      ausprobiert: $("ausprobiertInput") ? $("ausprobiertInput").value === "true" : (existing ? !!existing.ausprobiert : false),
+      favorit: existing ? !!existing.favorit : false,
+      bewertung: existing ? Number(existing.bewertung || 0) : 0,
+      erstelltAm: existing?.erstelltAm || new Date().toISOString(),
+      aktualisiertAm: new Date().toISOString()
+    };
+  }
+
+  function sig225(r) {
+    return [
+      String(r.name || "").trim().toLowerCase(),
+      String(r.kategorie || "").trim().toLowerCase(),
+      String(r.portionen || "").trim(),
+      String(r.zubereitung || "").trim().toLowerCase(),
+      JSON.stringify(r.zutaten || r.zutatenGruppen || [])
+    ].join("|");
+  }
+
+  function cleanAllDuplicates225(list) {
+    const seenId = new Set();
+    list.forEach(r => {
+      if (!r.id) r.id = id225();
+      if (seenId.has(String(r.id))) r.id = id225();
+      seenId.add(String(r.id));
+    });
+
+    // gleiche Rezepte, die direkt mehrfach gespeichert wurden: nur eines behalten
+    const seenSig = new Set();
+    const cleaned = [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const r = list[i];
+      const sig = sig225(r);
+      if (sig && seenSig.has(sig)) continue;
+      seenSig.add(sig);
+      cleaned.unshift(r);
+    }
+    return cleaned;
+  }
+
+  function goStart225() {
+    ["formularBereich", "rezeptSucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+    const ergebnisse = $("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      ergebnisse.hidden = true;
+      ergebnisse.style.display = "none";
+    }
+    document.body.classList.add("rf205-start");
+  }
+
+  function saveOnce225() {
+    const now = Date.now();
+
+    // Harte Sperre: innerhalb 2 Sekunden nur ein Speichern.
+    if (rf225Saving || now - rf225LastSaveAt < 2000) {
+      console.warn("Doppeltes Speichern blockiert.");
+      return false;
+    }
+
+    rf225Saving = true;
+    rf225LastSaveAt = now;
+
+    try {
+      let list = load225();
+
+      let idx = rf225EditIndex;
+      try {
+        if (idx === null && typeof bearbeitungsIndex === "number") idx = bearbeitungsIndex;
+      } catch(e) {}
+      if (idx === null && typeof window.bearbeitungsIndex === "number") idx = window.bearbeitungsIndex;
+
+      const isEdit = Number.isInteger(idx) && idx >= 0 && idx < list.length;
+      const existing = isEdit ? list[idx] : null;
+      const recipe = recipeFromForm225(existing, isEdit);
+
+      if (!recipe.name) {
+        alert("Bitte einen Rezeptnamen eingeben.");
+        return false;
+      }
+      if (!recipe.zutaten.length) {
+        alert("Bitte mindestens eine Zutat eingeben.");
+        return false;
+      }
+      if (!recipe.zubereitung) {
+        alert("Bitte eine Zubereitung eingeben.");
+        return false;
+      }
+
+      if (isEdit) list[idx] = recipe;
+      else list.push(recipe);
+
+      list = cleanAllDuplicates225(list);
+      save225(list);
+
+      rf225EditIndex = null;
+      window.bearbeitungsIndex = null;
+      try { bearbeitungsIndex = null; } catch(e) {}
+
+      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+      if (typeof meldungAnzeigen === "function") meldungAnzeigen("Rezept gespeichert.");
+      else alert("Rezept gespeichert.");
+
+      goStart225();
+
+      return true;
+    } finally {
+      setTimeout(() => { rf225Saving = false; }, 2200);
+    }
+  }
+
+  const oldEdit225 = window.rezeptBearbeiten;
+  window.rezeptBearbeiten = function(index) {
+    rf225EditIndex = Number(index);
+    window.bearbeitungsIndex = Number(index);
+    try { bearbeitungsIndex = Number(index); } catch(e) {}
+
+    if (typeof window.rf212RezeptBearbeiten === "function") return window.rf212RezeptBearbeiten(index);
+    if (typeof oldEdit225 === "function" && oldEdit225 !== window.rezeptBearbeiten) return oldEdit225(index);
+    return false;
+  };
+
+  function deleteOne225(index) {
+    const list = load225();
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= list.length) {
+      alert("Rezept wurde nicht gefunden.");
+      return false;
+    }
+    const name = list[i]?.name || "dieses Rezept";
+    if (!confirm(`Möchtest du "${name}" wirklich löschen?`)) return false;
+    list.splice(i, 1);
+    save225(list);
+    try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch(e) {}
+    return true;
+  }
+
+  window.rf225SaveOnce = saveOnce225;
+  window.rezeptSpeichern = saveOnce225;
+  window.rezeptSpeichernDirektCloud = saveOnce225;
+  window.rf155RezeptSpeichern = saveOnce225;
+  window.rezeptLoeschen = deleteOne225;
+
+  try {
+    rezeptSpeichern = saveOnce225;
+    rezeptSpeichernDirektCloud = saveOnce225;
+    rf155RezeptSpeichern = saveOnce225;
+    rezeptLoeschen = deleteOne225;
+  } catch(e) {}
+
+  function bind225() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (text === "rezept speichern" || text === "speichern" || onclick.includes("rezeptSpeichern") || onclick.includes("rf155RezeptSpeichern")) {
+        btn.type = "button";
+        btn.removeAttribute("onclick");
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          event.stopPropagation();
+          return saveOnce225();
+        };
+      }
+
+      if (text === "löschen" || onclick.includes("rezeptLoeschen")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          const m = (btn.getAttribute("onclick") || onclick).match(/(\d+)/);
+          if (m) {
+            event.preventDefault();
+            event.stopPropagation();
+            return deleteOne225(Number(m[1]));
+          }
+        };
+      }
+    });
+  }
+
+  // Capture-Phase: verhindert, dass alte Handler zusätzlich laufen.
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+    const onclick = btn.getAttribute("onclick") || "";
+
+    if (text === "rezept speichern" || text === "speichern" || onclick.includes("rezeptSpeichern") || onclick.includes("rf155RezeptSpeichern")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      event.stopPropagation();
+      return saveOnce225();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    load225();
+    bind225();
+    setTimeout(bind225, 300);
+    setTimeout(bind225, 1000);
+    setTimeout(bind225, 2000);
+  });
+})();
