@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.4";
+const APP_VERSION = "3.5";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://oxsuwvbfzijbzffkaqeg.supabase.co";
@@ -1680,5 +1680,160 @@ window.rf34Diagnose = function() {
     alleRezepteButton: !!document.getElementById("rf207AlleRezepte"),
     sucheButton: !!document.getElementById("rf207RezepteSuchen"),
     pruefenButton: !!document.getElementById("rf207RezeptePruefen")
+  };
+};
+
+
+// =====================================================
+// v3.5 Cloud nur bei Klick verbinden
+// Keine automatische Meldung "Cloud wird verbunden ..." beim Start.
+// =====================================================
+
+function cloudKeyVorhandenV35() {
+  return !!(SUPABASE_KEY && !String(SUPABASE_KEY).includes("PASTE_YOUR_SUPABASE_ANON_KEY_HERE"));
+}
+
+function cloudInitV35(showMessage = true) {
+  if (supabaseClient) return supabaseClient;
+
+  if (!cloudKeyVorhandenV35()) {
+    if (showMessage) {
+      cloudStatus("Cloud ist noch nicht eingerichtet. Bitte Supabase-Key eintragen.", true);
+      alert("Cloud ist noch nicht eingerichtet. Bitte Supabase-Key eintragen.");
+    }
+    return null;
+  }
+
+  if (!window.supabase) {
+    if (showMessage) {
+      cloudStatus("Supabase-Bibliothek konnte nicht geladen werden.", true);
+      alert("Supabase-Bibliothek konnte nicht geladen werden.");
+    }
+    return null;
+  }
+
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  if (showMessage) {
+    cloudStatus("Cloud verbunden.");
+  }
+
+  return supabaseClient;
+}
+
+async function cloudSpeichernAlleV35() {
+  const client = cloudInitV35(true);
+  if (!client) return false;
+
+  cloudStatus("Speichere in Cloud ...");
+
+  const rows = rezepte.map(r => ({
+    id: String(r.id),
+    name: r.name || "Unbenanntes Rezept",
+    daten: r,
+    aktualisiert_am: new Date().toISOString()
+  }));
+
+  const { error } = await client.from("rezepte").upsert(rows, { onConflict: "id" });
+
+  if (error) {
+    cloudStatus("Cloud-Speichern fehlgeschlagen: " + error.message, true);
+    alert("Cloud-Speichern fehlgeschlagen: " + error.message);
+    return false;
+  }
+
+  cloudStatus(`${rows.length} Rezept(e) in Cloud gespeichert.`);
+  alert(`${rows.length} Rezept(e) in Cloud gespeichert.`);
+  return false;
+}
+
+async function cloudLadenV35() {
+  const client = cloudInitV35(true);
+  if (!client) return false;
+
+  cloudStatus("Lade aus Cloud ...");
+
+  const { data, error } = await client.from("rezepte").select("*");
+
+  if (error) {
+    cloudStatus("Cloud-Laden fehlgeschlagen: " + error.message, true);
+    alert("Cloud-Laden fehlgeschlagen: " + error.message);
+    return false;
+  }
+
+  rezepte = normalizeRecipeList((data || []).map(row => row.daten || row.rezept || row));
+  speichereRezepte();
+
+  cloudStatus(`${rezepte.length} Rezept(e) aus Cloud geladen.`);
+  alert(`${rezepte.length} Rezept(e) aus Cloud geladen.`);
+  return false;
+}
+
+function cloudStatusStartNeutralV35() {
+  const el = document.getElementById("cloudStatus");
+  if (!el) return;
+
+  const text = (el.textContent || "").toLowerCase();
+  if (
+    text.includes("cloud wird verbunden") ||
+    text.includes("wird verbunden") ||
+    text.includes("verbunden ...")
+  ) {
+    el.textContent = "";
+  }
+}
+
+window.cloudInit = cloudInitV35;
+window.cloudSpeichernAlle = cloudSpeichernAlleV35;
+window.cloudLaden = cloudLadenV35;
+window.ausCloudLaden = cloudLadenV35;
+
+try {
+  cloudInit = cloudInitV35;
+  cloudSpeichernAlle = cloudSpeichernAlleV35;
+  cloudLaden = cloudLadenV35;
+  ausCloudLaden = cloudLadenV35;
+} catch(e) {}
+
+function bindCloudButtonsV35() {
+  const save = document.getElementById("rf207CloudSpeichern");
+  if (save) {
+    save.type = "button";
+    save.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return cloudSpeichernAlleV35();
+    };
+  }
+
+  const load = document.getElementById("rf207CloudLaden");
+  if (load) {
+    load.type = "button";
+    load.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return cloudLadenV35();
+    };
+  }
+}
+
+window.addEventListener("load", function() {
+  cloudStatusStartNeutralV35();
+  bindCloudButtonsV35();
+
+  setTimeout(cloudStatusStartNeutralV35, 100);
+  setTimeout(cloudStatusStartNeutralV35, 500);
+  setTimeout(bindCloudButtonsV35, 300);
+  setTimeout(bindCloudButtonsV35, 1000);
+});
+
+window.rf35Diagnose = function() {
+  return {
+    cloudKeyVorhanden: cloudKeyVorhandenV35(),
+    cloudStatus: document.getElementById("cloudStatus") ? document.getElementById("cloudStatus").textContent : null
   };
 };
