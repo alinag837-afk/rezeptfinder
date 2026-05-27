@@ -1110,3 +1110,25 @@ body.rf205-start #rf205BackupPanel {
   display: block;
   margin-top: 16px;
 }
+
+
+/* VERSION 2.37 sichere Suchkarten */
+.rf237-rezeptkarte {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 16px;
+  margin: 14px 0;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+
+.rf237-rezeptkarte h3 {
+  margin-top: 0;
+}
+
+.rf237-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}

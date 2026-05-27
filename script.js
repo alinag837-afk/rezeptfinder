@@ -31511,3 +31511,345 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.37 Fix: keine Doppelspeicherung + echte Suchkarten
+// =====================================================
+
+(function () {
+  const KEY = "rezepte";
+  const SAFE = "rezepte_rf235_sicherung";
+
+  function $(id) { return document.getElementById(id); }
+
+  function parseList() {
+    try {
+      const data = JSON.parse(localStorage.getItem(KEY) || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function makeId() {
+    try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch(e) {}
+    return "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function norm(v) {
+    return String(v || "").toLowerCase().trim().replace(/\s+/g, " ");
+  }
+
+  function ingredientSignature(r) {
+    const parts = [];
+
+    if (Array.isArray(r.zutaten)) {
+      r.zutaten.forEach(z => {
+        if (typeof z === "string") parts.push(norm(z));
+        else if (z) parts.push(norm([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" ")));
+      });
+    }
+
+    if (Array.isArray(r.zutatenGruppen)) {
+      r.zutatenGruppen.forEach(g => {
+        (g.zutaten || []).forEach(z => {
+          if (typeof z === "string") parts.push(norm(z));
+          else if (z) parts.push(norm([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" ")));
+        });
+      });
+    }
+
+    return parts.join("|");
+  }
+
+  function recipeSignature(r) {
+    return [
+      norm(r.name),
+      norm(r.kategorie),
+      norm(r.portionen),
+      norm(r.quelle),
+      norm(r.zubereitung),
+      ingredientSignature(r)
+    ].join("§");
+  }
+
+  function cleanList(list) {
+    if (!Array.isArray(list)) list = [];
+
+    const result = [];
+    const seenId = new Set();
+    const seenSig = new Set();
+
+    // Von hinten nach vorne: neueste Version behalten.
+    for (let i = list.length - 1; i >= 0; i--) {
+      const r = list[i];
+      if (!r || typeof r !== "object") continue;
+      if (r.geloescht || r.deleted || r.__deleted || r.id === "__rezeptfinder_deleted_keys__") continue;
+
+      if (!r.id) r.id = makeId();
+      if (seenId.has(String(r.id))) r.id = makeId();
+
+      const sig = recipeSignature(r);
+      if (sig && seenSig.has(sig)) continue;
+
+      seenId.add(String(r.id));
+      seenSig.add(sig);
+      result.unshift(r);
+    }
+
+    return result;
+  }
+
+  function saveList(list) {
+    list = cleanList(list);
+    localStorage.setItem(KEY, JSON.stringify(list));
+    localStorage.setItem(SAFE, JSON.stringify(list));
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+    return list;
+  }
+
+  function value(id) {
+    const el = $(id);
+    if (!el) return "";
+
+    if (el.tagName && el.tagName.toLowerCase() === "select" && el.multiple) {
+      return Array.from(el.selectedOptions || []).map(o => o.value || o.textContent || "").join(" ");
+    }
+
+    return String(el.value || "").trim();
+  }
+
+  function ingredientsText(r) {
+    const parts = [];
+
+    if (Array.isArray(r.zutaten)) {
+      r.zutaten.forEach(z => {
+        if (typeof z === "string") parts.push(z);
+        else if (z) parts.push([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" "));
+      });
+    }
+
+    if (Array.isArray(r.zutatenGruppen)) {
+      r.zutatenGruppen.forEach(g => {
+        if (g && g.name) parts.push(g.name);
+        (g.zutaten || []).forEach(z => {
+          if (typeof z === "string") parts.push(z);
+          else if (z) parts.push([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" "));
+        });
+      });
+    }
+
+    return norm(parts.join(" "));
+  }
+
+  function tagsText(r) {
+    if (Array.isArray(r.tags)) return norm(r.tags.join(" "));
+    return norm(r.tags || "");
+  }
+
+  function selectedCategories() {
+    const active = Array.from(document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel.aktiv, #suchKategorieKacheln .such-kategorie-kachel.aktiv"));
+    return active.map(el => el.dataset?.kategorie || "").filter(Boolean);
+  }
+
+  function esc(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderResults(results) {
+    const out = $("ergebnisse");
+    if (!out) return;
+
+    out.hidden = false;
+    out.style.display = "";
+    out.classList.remove("versteckt");
+
+    if (!results.length) {
+      out.innerHTML = "<p>Keine Rezepte gefunden.</p>";
+      return;
+    }
+
+    out.innerHTML = results.map(r => `
+      <div class="rf237-rezeptkarte">
+        <h3>${esc(r.name || "Unbenanntes Rezept")}</h3>
+        <p><strong>Kategorie:</strong> ${esc(r.kategorie || "Nicht zugeordnet")}</p>
+        ${r.quelle ? `<p><strong>Quelle:</strong> ${esc(r.quelle)}</p>` : ""}
+        ${r.portionen ? `<p><strong>Portionen:</strong> ${esc(r.portionen)}</p>` : ""}
+        <div class="rf237-aktionen">
+          <button type="button" onclick="rezeptAnzeigen(${r.index})">Ansehen</button>
+          <button type="button" onclick="rezeptBearbeiten(${r.index})">Bearbeiten</button>
+          <button type="button" onclick="rezeptLoeschen(${r.index})">Löschen</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function search237() {
+    let list = cleanList(parseList());
+    saveList(list); // bereinigt doppelte Einträge dauerhaft
+
+    const nameQ = norm(value("suchNameInput"));
+    const zutQ = norm(value("suchZutatenInput"));
+    const tagQ = norm(value("suchTagInput") || value("suchTagsInput"));
+    const quelleQ = norm(value("suchQuelleInput"));
+    const cats = selectedCategories();
+    const status = value("suchAusprobiertInput");
+
+    let results = list.map((r, index) => ({ ...r, index, vorhandene: [], fehlende: [] }));
+
+    results = results.filter(r => {
+      const nameOk = !nameQ || norm(r.name).includes(nameQ);
+      const zutOk = !zutQ || ingredientsText(r).includes(zutQ);
+      const tagOk = !tagQ || tagsText(r).includes(tagQ);
+      const quelleOk = !quelleQ || norm(r.quelle).includes(quelleQ);
+      const catOk = !cats.length || cats.includes(r.kategorie || "Nicht zugeordnet");
+      const statusOk = !status || status === "alle" || String(!!r.ausprobiert) === String(status);
+      return nameOk && zutOk && tagOk && quelleOk && catOk && statusOk;
+    });
+
+    const sort = value("suchSortierungInput") || "name";
+    if (sort === "name") results.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "de"));
+    if (sort === "kategorie") results.sort((a, b) => String(a.kategorie || "").localeCompare(String(b.kategorie || ""), "de"));
+    if (sort === "neu") results.sort((a, b) => String(b.aktualisiertAm || b.erstelltAm || "").localeCompare(String(a.aktualisiertAm || a.erstelltAm || "")));
+
+    window.letzteSuchErgebnisse = results;
+    try { letzteSuchErgebnisse = results; } catch(e) {}
+
+    renderResults(results);
+
+    const counter = $("suchTrefferAnzeige");
+    if (counter) counter.textContent = results.length + " Treffer";
+
+    return false;
+  }
+
+  function showAll237() {
+    const list = saveList(parseList());
+    const results = list.map((r, index) => ({ ...r, index, vorhandene: [], fehlende: [] }));
+    renderResults(results);
+    const counter = $("suchTrefferAnzeige");
+    if (counter) counter.textContent = results.length + " Treffer";
+    return false;
+  }
+
+  function openSearch237() {
+    document.body.classList.remove("rf205-start", "startseite-clean");
+
+    ["formularBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      el.hidden = true;
+      el.style.display = "none";
+      el.classList.add("versteckt");
+    });
+
+    const search = $("rezeptSucheBereich") || $("sucheBereich");
+    if (search) {
+      search.hidden = false;
+      search.style.display = "";
+      search.classList.remove("versteckt");
+    }
+
+    saveList(parseList());
+    return false;
+  }
+
+  // Nach jedem Speichern kurz später Duplikate bereinigen.
+  function scheduleDedupe() {
+    setTimeout(() => saveList(parseList()), 300);
+    setTimeout(() => saveList(parseList()), 1200);
+  }
+
+  const oldSave237 = window.rf235Save || window.rezeptSpeichern;
+  window.rezeptSpeichern = function() {
+    const result = typeof oldSave237 === "function" ? oldSave237.apply(this, arguments) : false;
+    scheduleDedupe();
+    return result;
+  };
+  window.rf155RezeptSpeichern = window.rezeptSpeichern;
+  window.rezeptSpeichernDirektCloud = window.rezeptSpeichern;
+
+  try {
+    rezeptSpeichern = window.rezeptSpeichern;
+    rf155RezeptSpeichern = window.rezeptSpeichern;
+    rezeptSpeichernDirektCloud = window.rezeptSpeichern;
+  } catch(e) {}
+
+  window.rezeptSucheAusfuehren = search237;
+  window.filterAnwenden = showAll237;
+  window.rf237Search = search237;
+  window.rf237ShowAll = showAll237;
+  window.rf237Dedupe = function() { return saveList(parseList()).length; };
+
+  try {
+    rezeptSucheAusfuehren = search237;
+    filterAnwenden = showAll237;
+  } catch(e) {}
+
+  function bind237() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (text === "rezepte suchen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return openSearch237();
+        };
+      }
+
+      if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return search237();
+        };
+      }
+
+      if (text === "alle anzeigen" || onclick.includes("filterAnwenden")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return showAll237();
+        };
+      }
+
+      if (text === "rezept speichern" || text === "speichern") {
+        const previous = btn.onclick;
+        btn.onclick = function(event) {
+          const result = previous ? previous.call(this, event) : window.rezeptSpeichern();
+          scheduleDedupe();
+          return result;
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    saveList(parseList());
+    bind237();
+    setTimeout(bind237, 300);
+    setTimeout(bind237, 1000);
+    setTimeout(bind237, 2000);
+  });
+
+  window.rf237Diagnose = function() {
+    const list = cleanList(parseList());
+    return {
+      gespeicherteRezepte: list.length,
+      namen: list.map(r => r.name),
+      ergebnisseHtmlLaenge: $("ergebnisse") ? $("ergebnisse").innerHTML.length : null
+    };
+  };
+})();
