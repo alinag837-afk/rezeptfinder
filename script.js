@@ -29698,3 +29698,326 @@ window.addEventListener("load", function () {
     setTimeout(bind225, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.26 Rezept-Assistent: Zutaten-Gruppen + Nährwerte
+// Erkennt:
+// - Für den Spargel / Für die Sauce hollandaise als eigene Gruppen
+// - Nährwerte pro 100 g in Nährwertfelder statt Notizen
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function cleanLine(line) {
+    return String(line || "")
+      .replace(/^[•\-\u2022]\s*/, "")
+      .replace(/^\d+\.\s*/, "")
+      .trim();
+  }
+
+  function sectionName(line) {
+    const l = cleanLine(line).toLowerCase();
+    if (/^quelle\b/.test(l)) return "quelle";
+    if (/^portionen?\b/.test(l)) return "portionen";
+    if (/^zutaten\b/.test(l)) return "zutaten";
+    if (/^zubereitung\b/.test(l)) return "zubereitung";
+    if (/^utensilien\b/.test(l)) return "utensilien";
+    if (/^nährwerte\b|^naehrwerte\b|^nährwert\b|^naehrwert\b/.test(l)) return "naehrwerte";
+    if (/^notizen?\b/.test(l)) return "notizen";
+    return "";
+  }
+
+  function parseIngredient(line) {
+    const text = cleanLine(line);
+    const m = text.match(/^(\d+(?:[,.]\d+)?(?:\s*-\s*\d+(?:[,.]\d+)?)?)\s*([a-zA-ZäöüÄÖÜß.]+)?\s+(.+)$/);
+
+    if (m) {
+      return {
+        menge: m[1].replace(",", ".").trim(),
+        einheit: (m[2] || "").trim(),
+        name: (m[3] || "").trim()
+      };
+    }
+
+    return { menge: "", einheit: "", name: text };
+  }
+
+  function parseNaehrwerte(text) {
+    const t = String(text || "").replace(/\n/g, " ");
+    function numFor(pattern) {
+      const m = t.match(pattern);
+      return m ? m[1].replace(",", ".") : "";
+    }
+
+    return {
+      kalorien: numFor(/(\d+(?:[,.]\d+)?)\s*kcal/i),
+      eiweiss: numFor(/(\d+(?:[,.]\d+)?)\s*g\s*(?:eiweiß|eiweiss|protein)/i),
+      kohlenhydrate: numFor(/(\d+(?:[,.]\d+)?)\s*g\s*kohlenhydrate/i),
+      fett: numFor(/(\d+(?:[,.]\d+)?)\s*g\s*fett/i),
+      zucker: numFor(/(\d+(?:[,.]\d+)?)\s*g\s*zucker/i),
+      ballaststoffe: numFor(/(\d+(?:[,.]\d+)?)\s*g\s*ballaststoffe/i),
+      salz: numFor(/(\d+(?:[,.]\d+)?)\s*g\s*salz/i)
+    };
+  }
+
+  function parseRecipeText226(text) {
+    const lines = String(text || "")
+      .split(/\r?\n/)
+      .map(cleanLine)
+      .filter(Boolean);
+
+    const recipe = {
+      name: "",
+      quelle: "",
+      portionen: "",
+      zutatenGruppen: [],
+      zubereitung: [],
+      utensilien: [],
+      notizen: "",
+      naehrwerte: {}
+    };
+
+    if (lines.length) recipe.name = lines[0];
+
+    let section = "";
+    let currentGroup = null;
+    let naehrText = "";
+
+    function ensureGroup(name) {
+      currentGroup = { name: name || "Zutaten", zutaten: [] };
+      recipe.zutatenGruppen.push(currentGroup);
+      return currentGroup;
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      const sec = sectionName(line);
+
+      if (sec) {
+        section = sec;
+        if (sec === "naehrwerte") {
+          naehrText += " " + line;
+        }
+        continue;
+      }
+
+      if (section === "quelle") {
+        recipe.quelle = line.replace(/^Quelle:\s*/i, "").trim();
+        continue;
+      }
+
+      if (section === "portionen") {
+        recipe.portionen = line.replace(/^Portionen?:\s*/i, "").trim();
+        continue;
+      }
+
+      if (section === "zutaten") {
+        if (/^für\s+/i.test(line)) {
+          ensureGroup(line.replace(/^für\s+/i, "").trim());
+          continue;
+        }
+
+        if (!currentGroup) ensureGroup("Zutaten");
+        currentGroup.zutaten.push(parseIngredient(line));
+        continue;
+      }
+
+      if (section === "zubereitung") {
+        recipe.zubereitung.push(line);
+        continue;
+      }
+
+      if (section === "utensilien") {
+        recipe.utensilien.push(line);
+        continue;
+      }
+
+      if (section === "naehrwerte") {
+        naehrText += " " + line;
+        continue;
+      }
+
+      if (section === "notizen") {
+        recipe.notizen += (recipe.notizen ? "\n" : "") + line;
+      }
+    }
+
+    recipe.naehrwerte = parseNaehrwerte(naehrText);
+
+    if (!recipe.zutatenGruppen.length) {
+      recipe.zutatenGruppen = [{ name: "Zutaten", zutaten: [] }];
+    }
+
+    return recipe;
+  }
+
+  function escAttr(value) {
+    return String(value == null ? "" : value).replace(/"/g, "&quot;");
+  }
+
+  function fillForm226(recipe) {
+    if ($("nameInput")) $("nameInput").value = recipe.name || "";
+    if ($("quelleInput")) $("quelleInput").value = recipe.quelle || "";
+    if ($("portionenInput")) $("portionenInput").value = recipe.portionen || "";
+    if ($("zubereitungInput")) $("zubereitungInput").value = (recipe.zubereitung || []).join("\n");
+    if ($("utensilienInput")) $("utensilienInput").value = (recipe.utensilien || []).join(", ");
+    if ($("notizenInput")) $("notizenInput").value = recipe.notizen || "";
+
+    const n = recipe.naehrwerte || {};
+    if ($("kalorienInput")) $("kalorienInput").value = n.kalorien || "";
+    if ($("eiweissInput")) $("eiweissInput").value = n.eiweiss || "";
+    if ($("kohlenhydrateInput")) $("kohlenhydrateInput").value = n.kohlenhydrate || "";
+    if ($("fettInput")) $("fettInput").value = n.fett || "";
+    if ($("zuckerInput")) $("zuckerInput").value = n.zucker || "";
+    if ($("ballaststoffeInput")) $("ballaststoffeInput").value = n.ballaststoffe || "";
+    if ($("salzInput")) $("salzInput").value = n.salz || "";
+
+    const container = $("zutatenGruppen");
+    if (container) {
+      container.innerHTML = "";
+
+      (recipe.zutatenGruppen || []).forEach((gruppe, gi) => {
+        const group = document.createElement("div");
+        group.className = "zutatengruppe";
+        group.innerHTML = `
+          <input type="text" class="zutaten-gruppenname" value="${escAttr(gruppe.name || (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1)))}">
+          <div class="zutaten-zeilen"></div>
+        `;
+
+        const rows = group.querySelector(".zutaten-zeilen");
+
+        (gruppe.zutaten || []).forEach(z => {
+          const row = document.createElement("div");
+          row.className = "zutaten-zeile zutat-zeile";
+          row.innerHTML = `
+            <input type="text" class="zutat-menge" placeholder="Menge" value="${escAttr(z.menge)}">
+            <input type="text" class="zutat-einheit" placeholder="Einheit" value="${escAttr(z.einheit)}">
+            <input type="text" class="zutat-name" placeholder="Zutat" value="${escAttr(z.name)}">
+          `;
+          rows.appendChild(row);
+        });
+
+        container.appendChild(group);
+      });
+    }
+  }
+
+  function previewHtml226(recipe) {
+    const groups = (recipe.zutatenGruppen || []).map(g => `
+      <h4>${g.name}</h4>
+      <ul>${(g.zutaten || []).map(z => `<li>${[z.menge, z.einheit, z.name].filter(Boolean).join(" ")}</li>`).join("")}</ul>
+    `).join("");
+
+    const n = recipe.naehrwerte || {};
+    const nList = [
+      n.kalorien ? `${n.kalorien} kcal` : "",
+      n.eiweiss ? `${n.eiweiss} g Eiweiß` : "",
+      n.kohlenhydrate ? `${n.kohlenhydrate} g Kohlenhydrate` : "",
+      n.fett ? `${n.fett} g Fett` : ""
+    ].filter(Boolean).join(", ");
+
+    return `
+      <div class="box">
+        <h3>${recipe.name || "Unbenanntes Rezept"}</h3>
+        <p><strong>Quelle:</strong> ${recipe.quelle || ""}</p>
+        <p><strong>Portionen:</strong> ${recipe.portionen || ""}</p>
+        <h4>Zutaten</h4>
+        ${groups}
+        <h4>Zubereitung</h4>
+        <ol>${(recipe.zubereitung || []).map(s => `<li>${s}</li>`).join("")}</ol>
+        <h4>Utensilien</h4>
+        <p>${(recipe.utensilien || []).join(", ")}</p>
+        <h4>Nährwerte pro 100 g</h4>
+        <p>${nList || "Keine erkannt"}</p>
+        <button type="button" id="rf226InsFormularButton">Ins Formular übernehmen</button>
+      </div>
+    `;
+  }
+
+  function analyze226() {
+    const input = $("textImportInput");
+    const preview = $("assistentVorschau");
+
+    if (!input || !preview) return false;
+
+    const recipe = parseRecipeText226(input.value);
+    window.rf226AssistentRecipe = recipe;
+
+    preview.innerHTML = previewHtml226(recipe);
+    preview.hidden = false;
+    preview.style.display = "";
+    preview.classList.remove("versteckt");
+
+    const btn = $("rf226InsFormularButton");
+    if (btn) {
+      btn.onclick = function () {
+        fillForm226(window.rf226AssistentRecipe || recipe);
+
+        const assistent = $("textImportBereich");
+        if (assistent) {
+          assistent.hidden = true;
+          assistent.style.display = "none";
+          assistent.classList.add("versteckt");
+        }
+
+        preview.innerHTML = "";
+        input.value = "";
+
+        const form = $("formularBereich");
+        if (form) {
+          form.hidden = false;
+          form.style.display = "";
+          form.classList.remove("versteckt");
+          form.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        return false;
+      };
+    }
+
+    return false;
+  }
+
+  // Assistent-Funktionen überschreiben
+  window.rf226AssistentAnalysieren = analyze226;
+  window.rf153AssistentVorschau = analyze226;
+  window.rezeptAnalysierenDirektFinal = analyze226;
+  window.rezeptAnalysierenDirekt = analyze226;
+
+  function bind226() {
+    const btn = $("rezeptAnalysierenButton");
+    if (btn) {
+      btn.type = "button";
+      btn.onclick = function (event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return analyze226();
+      };
+    }
+
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+      if (text === "rezept analysieren") {
+        button.type = "button";
+        button.onclick = function (event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return analyze226();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function () {
+    bind226();
+    setTimeout(bind226, 300);
+    setTimeout(bind226, 1000);
+  });
+})();
