@@ -30021,3 +30021,145 @@ window.addEventListener("load", function () {
     setTimeout(bind226, 1000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.27 Assistent: Portionen + Einheiten-Dropdowns
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  const RF227_EINHEITEN = (typeof EINHEITEN !== "undefined" && Array.isArray(EINHEITEN))
+    ? EINHEITEN
+    : ["","mg","g","dag","kg","ml","cl","dl","l","TL","EL","Stk.","Prise","Becher","Tasse","Päckchen","Dose","Glas","Bund","Zweig","Blatt","Scheibe","Würfel","Messerspitze","Spritzer","Handvoll"];
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/"/g, "&quot;");
+  }
+
+  function clean(line) {
+    return String(line || "")
+      .replace(/^[•\-\u2022]\s*/, "")
+      .replace(/^\d+\.\s*/, "")
+      .trim();
+  }
+
+  function parsePortionenFromText(text) {
+    const lines = String(text || "").split(/\r?\n/).map(clean).filter(Boolean);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+
+      if (/^portionen?\b/.test(line)) {
+        const sameLine = lines[i].replace(/^portionen?:?\s*/i, "").trim();
+        if (sameLine && !/^portionen?$/i.test(sameLine)) {
+          const m = sameLine.match(/\d+(?:[,.]\d+)?/);
+          return m ? m[0].replace(",", ".") : sameLine;
+        }
+
+        const next = lines[i + 1] || "";
+        const m = next.match(/\d+(?:[,.]\d+)?/);
+        if (m) return m[0].replace(",", ".");
+        if (next) return next;
+      }
+    }
+
+    return "";
+  }
+
+  function unitOptions(selected) {
+    const sel = String(selected || "").trim();
+    const all = [...RF227_EINHEITEN];
+
+    if (sel && !all.some(e => e.toLowerCase() === sel.toLowerCase())) {
+      all.push(sel);
+    }
+
+    return all.map(e => {
+      const selectedAttr = e.toLowerCase() === sel.toLowerCase() ? " selected" : "";
+      return `<option value="${esc(e)}"${selectedAttr}>${esc(e)}</option>`;
+    }).join("");
+  }
+
+  function makeUnitSelect(value) {
+    return `<select class="zutat-einheit">${unitOptions(value)}</select>`;
+  }
+
+  function upgradeUnitInputsToDropdowns() {
+    document.querySelectorAll("#zutatenGruppen .zutat-einheit").forEach(el => {
+      if (el.tagName && el.tagName.toLowerCase() === "select") return;
+
+      const value = el.value || "";
+      const select = document.createElement("select");
+      select.className = el.className || "zutat-einheit";
+      select.innerHTML = unitOptions(value);
+
+      el.replaceWith(select);
+    });
+  }
+
+  function fillPortionenFromAssistantText() {
+    const input = $("textImportInput");
+    const portionenInput = $("portionenInput");
+
+    if (!input || !portionenInput) return;
+
+    const portionen = parsePortionenFromText(input.value);
+    if (portionen) portionenInput.value = portionen;
+  }
+
+  // Bestehende v2.26 Übernahmefunktion ergänzen:
+  const oldFill226 = window.fillForm226;
+  if (typeof oldFill226 === "function") {
+    window.fillForm226 = function(recipe) {
+      const result = oldFill226(recipe);
+      fillPortionenFromAssistantText();
+      upgradeUnitInputsToDropdowns();
+      return result;
+    };
+  }
+
+  // Da fillForm226 in v2.26 lokal war, greifen wir zusätzlich beim Klick auf "Ins Formular übernehmen".
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+
+    if (
+      btn.id === "rf226InsFormularButton" ||
+      text.includes("ins formular") ||
+      text.includes("übernehmen") ||
+      text.includes("uebernehmen")
+    ) {
+      setTimeout(() => {
+        fillPortionenFromAssistantText();
+        upgradeUnitInputsToDropdowns();
+      }, 80);
+
+      setTimeout(() => {
+        fillPortionenFromAssistantText();
+        upgradeUnitInputsToDropdowns();
+      }, 400);
+    }
+  }, true);
+
+  // Auch nach Rezept analysieren vorbereiten, falls Vorschau direkt Werte setzt.
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+    if (text === "rezept analysieren") {
+      setTimeout(fillPortionenFromAssistantText, 300);
+    }
+  }, true);
+
+  // Wenn der Assistent selbst Zutatenzeilen mit Text-Input erzeugt, beim Laden nachziehen.
+  window.addEventListener("load", function() {
+    setTimeout(upgradeUnitInputsToDropdowns, 500);
+    setTimeout(upgradeUnitInputsToDropdowns, 1500);
+  });
+})();
