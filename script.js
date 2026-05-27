@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.12";
+const APP_VERSION = "3.14";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://pkobmwkljznvhmlrnfqb.supabase.co";
@@ -2469,15 +2469,11 @@ function ensureSearchAccordionV311() {
     details.appendChild(content);
     content.appendChild(el);
   }
-
-  const zutaten = document.getElementById("suchZutatenInput");
   const tags = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
   const quelle = document.getElementById("suchQuelleInput");
   const status = document.getElementById("suchAusprobiertInput");
   const sortierung = document.getElementById("suchSortierungInput") || document.getElementById("sortierungInput");
   const kategorien = document.getElementById("suchKategorieKacheln");
-
-  wrap(zutaten && (zutaten.closest(".form-group") || zutaten.parentElement || zutaten), "Zutaten");
   wrap(tags && (tags.closest(".form-group") || tags.parentElement || tags), "Tags");
   wrap(quelle && (quelle.closest(".form-group") || quelle.parentElement || quelle), "Quellen");
   wrap(kategorien, "Kategorien");
@@ -2785,6 +2781,165 @@ window.rf312Diagnose = function() {
       text: button ? button.textContent.trim() : "",
       hatAktion: !!(button && rf312ActionForButton(button)),
       hatOnclick: !!(button && button.onclick)
+    };
+  });
+};
+
+// =====================================================
+// v3.14 Runtime-Fix: Buttons stabil repariert
+// =====================================================
+
+function rf314ClearResultsSafe() {
+  if (typeof clearResultsV34 === "function") {
+    clearResultsV34();
+    return;
+  }
+  const output = document.getElementById("ergebnisse");
+  if (output) {
+    output.innerHTML = "";
+    output.hidden = true;
+    output.style.display = "none";
+    output.classList.add("versteckt");
+  }
+}
+
+function rf314ShowArea(id) {
+  if (typeof bereichAnzeigen === "function") return bereichAnzeigen(id);
+  const el = document.getElementById(id);
+  if (el) {
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+  }
+  return false;
+}
+
+function rf314Safe(fnName, fallback) {
+  return function() {
+    try {
+      if (typeof window[fnName] === "function") return window[fnName]();
+      if (typeof fallback === "function") return fallback();
+      alert("Funktion nicht gefunden: " + fnName);
+      return false;
+    } catch (error) {
+      console.error("Button-Fehler v3.14:", fnName, error);
+      alert("Fehler bei " + fnName + ": " + (error.message || "unbekannter Fehler"));
+      return false;
+    }
+  };
+}
+
+function rf314Action(button) {
+  if (!button) return null;
+  const id = button.id || "";
+  const text = (button.textContent || "").trim().toLowerCase();
+  const onclick = button.getAttribute("onclick") || "";
+
+  const map = {
+    rf207CloudSpeichern: rf314Safe("cloudSpeichernAlle"),
+    rf207CloudLaden: rf314Safe("cloudLaden"),
+    rf207CloudBackups: rf314Safe("cloudBackupsAnzeigen"),
+    rf207BackupDownload: rf314Safe("backupErstellen"),
+    rf207RezepteSuchen: function() {
+      rf314ClearResultsSafe();
+      if (typeof window.rezeptSucheToggle === "function") return window.rezeptSucheToggle();
+      return rf314ShowArea("rezeptSucheBereich");
+    },
+    rf207RezeptHinzufuegen: function() {
+      rf314ClearResultsSafe();
+      if (typeof window.neuesRezeptOeffnen === "function") return window.neuesRezeptOeffnen();
+      return rf314ShowArea("formularBereich");
+    },
+    rf207AlleRezepte: rf314Safe("alleRezepteAnzeigen"),
+    rf207Einkaufsliste: function() {
+      rf314ClearResultsSafe();
+      rf314ShowArea("einkaufBereich");
+      if (typeof window.einkaufslisteErstellen === "function") return window.einkaufslisteErstellen();
+      return false;
+    },
+    rf207RezeptAssistent: function() {
+      rf314ClearResultsSafe();
+      if (typeof window.textImportToggle === "function") return window.textImportToggle();
+      return rf314ShowArea("textImportBereich");
+    },
+    rf207RezeptePruefen: rf314Safe("datenpruefungToggle"),
+    saveRecipeButton: rf314Safe("rezeptSpeichern"),
+    rezeptAnalysierenButton: rf314Safe("rezeptAnalysierenDirekt")
+  };
+
+  if (map[id]) return map[id];
+
+  if (text === "rezept speichern" || text === "speichern" || onclick.includes("rezeptSpeichern")) return rf314Safe("rezeptSpeichern");
+  if (text === "rezept analysieren" || onclick.includes("rezeptAnalysierenDirekt") || onclick.includes("rf153AssistentVorschau")) return rf314Safe("rezeptAnalysierenDirekt");
+  if (text === "rezepte suchen") return map.rf207RezepteSuchen;
+  if (text === "rezept hinzufügen" || text === "rezept hinzufuegen") return map.rf207RezeptHinzufuegen;
+  if (text === "alle rezepte anzeigen" || text === "alle anzeigen") return rf314Safe("alleRezepteAnzeigen");
+  if (text === "einkaufsliste") return map.rf207Einkaufsliste;
+  if (text === "rezept-assistent" || text === "rezept assistent") return map.rf207RezeptAssistent;
+  if (text === "rezepte prüfen" || text === "rezepte pruefen") return rf314Safe("datenpruefungToggle");
+  if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) return rf314Safe("rezeptSucheAusfuehren");
+  if (onclick.includes("rezeptAssistentZuruecksetzen")) return rf314Safe("rezeptAssistentZuruecksetzen");
+  if (onclick.includes("einkaufslisteZuruecksetzen")) return rf314Safe("einkaufslisteZuruecksetzen");
+  if (onclick.includes("sucheZuruecksetzen")) return rf314Safe("sucheZuruecksetzen");
+  if (onclick.includes("kategorienAufAlleSetzen")) return rf314Safe("kategorienAufAlleSetzen");
+  if (onclick.includes("einkaufslisteDrucken")) return rf314Safe("einkaufslisteDrucken");
+
+  return null;
+}
+
+function rf314BindButtons() {
+  document.querySelectorAll("button").forEach(button => {
+    const action = rf314Action(button);
+    if (!action) return;
+    button.type = "button";
+    button.removeAttribute("onclick");
+    button.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return action();
+    };
+  });
+}
+
+document.addEventListener("click", function(event) {
+  const button = event.target && event.target.closest ? event.target.closest("button") : null;
+  if (!button) return;
+  const action = rf314Action(button);
+  if (!action) return;
+  event.preventDefault();
+  event.stopPropagation();
+  return action();
+}, true);
+
+window.bindAllButtonsV312 = rf314BindButtons;
+window.bindMainActionButtonsV310 = rf314BindButtons;
+window.rf314BindButtons = rf314BindButtons;
+
+window.addEventListener("load", function() {
+  rf314BindButtons();
+  setTimeout(rf314BindButtons, 100);
+  setTimeout(rf314BindButtons, 500);
+  setTimeout(rf314BindButtons, 1500);
+  setTimeout(rf314BindButtons, 3000);
+});
+
+window.rf314Diagnose = function() {
+  const ids = [
+    "rf207CloudSpeichern", "rf207CloudLaden", "rf207CloudBackups",
+    "rf207BackupDownload", "rf207RezepteSuchen", "rf207RezeptHinzufuegen",
+    "rf207AlleRezepte", "rf207Einkaufsliste", "rf207RezeptAssistent",
+    "rf207RezeptePruefen", "saveRecipeButton", "rezeptAnalysierenButton"
+  ];
+  return ids.map(id => {
+    const button = document.getElementById(id);
+    return {
+      id,
+      vorhanden: !!button,
+      aktion: !!(button && rf314Action(button)),
+      onclick: !!(button && button.onclick),
+      text: button ? button.textContent.trim() : ""
     };
   });
 };
