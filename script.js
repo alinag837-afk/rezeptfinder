@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.6";
+const APP_VERSION = "3.8";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://oxsuwvbfzijbzffkaqeg.supabase.co";
@@ -1893,5 +1893,315 @@ window.rf36Diagnose = function() {
   return {
     cloudStatusText: el ? el.textContent : null,
     cloudStatusElementGefunden: !!el
+  };
+};
+
+
+// =====================================================
+// v3.7 Sichtbarer Cloud-Status
+// =====================================================
+
+function updateCloudStatusV37() {
+  const el =
+    document.getElementById("cloudStatusText") ||
+    document.getElementById("cloudStatus");
+
+  if (!el) return;
+
+  const hasKey =
+    typeof SUPABASE_KEY !== "undefined" &&
+    SUPABASE_KEY &&
+    !String(SUPABASE_KEY).includes("PASTE_");
+
+  if (supabaseClient) {
+    el.textContent = "Verbunden";
+    el.style.color = "green";
+    return;
+  }
+
+  if (hasKey) {
+    el.textContent = "Bereit zum Verbinden";
+    el.style.color = "#b8860b";
+    return;
+  }
+
+  el.textContent = "Nicht verbunden";
+  el.style.color = "crimson";
+}
+
+window.addEventListener("load", function() {
+  updateCloudStatusV37();
+  setTimeout(updateCloudStatusV37, 100);
+  setTimeout(updateCloudStatusV37, 500);
+});
+
+const oldCloudInitV37 = window.cloudInit || cloudInit;
+
+window.cloudInit = function(...args) {
+  const result = oldCloudInitV37.apply(this, args);
+  setTimeout(updateCloudStatusV37, 10);
+  return result;
+};
+
+try {
+  cloudInit = window.cloudInit;
+} catch(e) {}
+
+const oldCloudStatusV37 = window.cloudStatus || cloudStatus;
+
+window.cloudStatus = function(text, error = false) {
+  oldCloudStatusV37(text, error);
+
+  const el =
+    document.getElementById("cloudStatusText") ||
+    document.getElementById("cloudStatus");
+
+  if (!el) return;
+
+  if (
+    String(text || "").toLowerCase().includes("gespeichert") ||
+    String(text || "").toLowerCase().includes("geladen")
+  ) {
+    el.style.color = "green";
+  } else if (error) {
+    el.style.color = "crimson";
+  }
+};
+
+try {
+  cloudStatus = window.cloudStatus;
+} catch(e) {}
+
+
+// =====================================================
+// v3.8 Fix: Rezept speichern Button + Quellen-Dropdown
+// =====================================================
+
+function quellenAusGespeichertenRezeptenV38() {
+  return [...new Set(
+    (Array.isArray(rezepte) ? rezepte : [])
+      .map(r => String(r.quelle || "").trim())
+      .filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b, "de", { sensitivity: "base" }));
+}
+
+function quellenDropdownAktualisierenV38() {
+  const sources = quellenAusGespeichertenRezeptenV38();
+
+  // Datalist beim Formular-Quellenfeld
+  let datalist = document.getElementById("quellenListe");
+  if (!datalist) {
+    datalist = document.createElement("datalist");
+    datalist.id = "quellenListe";
+    document.body.appendChild(datalist);
+  }
+
+  datalist.innerHTML = sources
+    .map(q => `<option value="${esc(q)}"></option>`)
+    .join("");
+
+  const quelleInput = document.getElementById("quelleInput");
+  if (quelleInput) {
+    quelleInput.setAttribute("list", "quellenListe");
+  }
+
+  // Quellenfilter in der Suche
+  const suchQuelle = document.getElementById("suchQuelleInput");
+  if (suchQuelle) {
+    const current = suchQuelle.value || "";
+    suchQuelle.innerHTML =
+      `<option value="">Alle Quellen</option>` +
+      sources.map(q => `<option value="${esc(q)}"${q === current ? " selected" : ""}>${esc(q)}</option>`).join("");
+  }
+}
+
+// Robuste Zutaten-Lesung für Speichern.
+// Falls der DOM-Parser wegen dynamischer Felder nichts findet, wenigstens Formular nicht blockieren,
+// wenn Gruppen-HTML vorhanden ist.
+function zutatenAusFormularV38() {
+  const groups = [];
+  const container = document.getElementById("zutatenGruppen");
+  if (!container) return { groups: [], flat: [] };
+
+  const groupEls = Array.from(container.querySelectorAll(".zutatengruppe"));
+  const actualGroups = groupEls.length ? groupEls : [container];
+
+  actualGroups.forEach((group, groupIndex) => {
+    const groupName =
+      group.querySelector(".zutaten-gruppenname")?.value?.trim() ||
+      (groupIndex === 0 ? "Zutaten" : "Gruppe " + (groupIndex + 1));
+
+    let rows = Array.from(group.querySelectorAll(".zutaten-zeile, .zutat-zeile"));
+
+    if (!rows.length) {
+      rows = Array.from(group.querySelectorAll(".zutat-name"))
+        .map(el => el.closest("div") || el.parentElement)
+        .filter(Boolean);
+    }
+
+    const zutaten = [];
+
+    rows.forEach(row => {
+      const menge = row.querySelector(".zutat-menge")?.value?.trim() || "";
+      const einheit = row.querySelector(".zutat-einheit")?.value?.trim() || "";
+      const name = row.querySelector(".zutat-name")?.value?.trim() || "";
+
+      if (menge || einheit || name) {
+        zutaten.push({ menge, einheit, name });
+      }
+    });
+
+    if (zutaten.length) groups.push({ name: groupName, zutaten });
+  });
+
+  return {
+    groups,
+    flat: groups.flatMap(g => g.zutaten || [])
+  };
+}
+
+// Speicherfunktion reparieren/überschreiben.
+function rezeptSpeichernV38() {
+  applyMacroTagsToForm();
+
+  const index = Number.isInteger(bearbeitungsIndex) ? bearbeitungsIndex : null;
+  const isEdit = index !== null && rezepte[index];
+  const existing = isEdit ? rezepte[index] : null;
+
+  const zutaten = zutatenAusFormularV38();
+
+  const recipe = applyMacroTagsToRecipe({
+    id: isEdit && existing?.id ? existing.id : uid(),
+    name: val("nameInput"),
+    kategorie: val("kategorieInput") || "Nicht zugeordnet",
+    portionen: val("portionenInput"),
+    schwierigkeit: val("schwierigkeitInput"),
+    zubereitungszeit: val("zubereitungszeitInput"),
+    quelle: val("quelleInput"),
+    tags: val("tagsInput").split(",").map(normalizeTag).filter(Boolean),
+    zubereitung: val("zubereitungInput"),
+    utensilien: val("utensilienInput").split(",").map(x => x.trim()).filter(Boolean),
+    notizen: val("notizenInput"),
+    naehrwerte: naehrwerteAusFormular(),
+    zutatenGruppen: zutaten.groups,
+    zutaten: zutaten.flat,
+    ausprobiert: val("ausprobiertInput") === "true",
+    favorit: existing ? !!existing.favorit : false,
+    bewertung: existing ? Number(existing.bewertung || 0) : 0,
+    erstelltAm: existing?.erstelltAm || new Date().toISOString(),
+    aktualisiertAm: new Date().toISOString()
+  });
+
+  if (!recipe.name) {
+    meldungAnzeigen("Bitte einen Rezeptnamen eingeben.", true);
+    alert("Bitte einen Rezeptnamen eingeben.");
+    return false;
+  }
+
+  if (!recipe.portionen) {
+    meldungAnzeigen("Bitte Grundportionen eingeben.", true);
+    alert("Bitte Grundportionen eingeben.");
+    return false;
+  }
+
+  if (!recipe.zutaten.length) {
+    meldungAnzeigen("Bitte mindestens eine Zutat eingeben.", true);
+    alert("Bitte mindestens eine Zutat eingeben.");
+    return false;
+  }
+
+  if (!recipe.zubereitung) {
+    meldungAnzeigen("Bitte eine Zubereitung eingeben.", true);
+    alert("Bitte eine Zubereitung eingeben.");
+    return false;
+  }
+
+  if (isEdit) {
+    rezepte[index] = recipe;
+  } else {
+    rezepte.push(recipe);
+  }
+
+  bearbeitungsIndex = null;
+  speichereRezepte(true);
+  quellenDropdownAktualisierenV38();
+  formularLeeren();
+  zurUebersicht();
+
+  return false;
+}
+
+window.rezeptSpeichern = rezeptSpeichernV38;
+window.rf155RezeptSpeichern = rezeptSpeichernV38;
+window.rezeptSpeichernDirektCloud = rezeptSpeichernV38;
+window.quellenDropdownAktualisieren = quellenDropdownAktualisierenV38;
+window.updateSourceOptions = quellenDropdownAktualisierenV38;
+
+try {
+  rezeptSpeichern = rezeptSpeichernV38;
+  rf155RezeptSpeichern = rezeptSpeichernV38;
+  rezeptSpeichernDirektCloud = rezeptSpeichernV38;
+  quellenDropdownAktualisieren = quellenDropdownAktualisierenV38;
+} catch(e) {}
+
+function bindSaveAndSourcesV38() {
+  quellenDropdownAktualisierenV38();
+
+  const saveButton = document.getElementById("saveRecipeButton");
+  if (saveButton) {
+    saveButton.type = "button";
+    saveButton.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return rezeptSpeichernV38();
+    };
+  }
+
+  document.querySelectorAll("button").forEach(button => {
+    const text = (button.textContent || "").trim().toLowerCase();
+    const onclick = button.getAttribute("onclick") || "";
+
+    if (
+      text === "rezept speichern" ||
+      text === "speichern" ||
+      onclick.includes("rezeptSpeichern") ||
+      onclick.includes("rf155RezeptSpeichern")
+    ) {
+      button.type = "button";
+      button.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return rezeptSpeichernV38();
+      };
+    }
+  });
+}
+
+// Nach Laden und nach Rezeptlisten-Änderungen aktualisieren.
+const oldSpeichereRezepteV38 = speichereRezepte;
+speichereRezepte = function(showMessage = false) {
+  const result = oldSpeichereRezepteV38(showMessage);
+  quellenDropdownAktualisierenV38();
+  return result;
+};
+window.speichereRezepte = speichereRezepte;
+
+window.addEventListener("load", function() {
+  bindSaveAndSourcesV38();
+  setTimeout(bindSaveAndSourcesV38, 300);
+  setTimeout(bindSaveAndSourcesV38, 1000);
+});
+
+window.rf38Diagnose = function() {
+  return {
+    rezepte: Array.isArray(rezepte) ? rezepte.length : null,
+    quellen: quellenAusGespeichertenRezeptenV38(),
+    saveButtonGefunden: !!document.getElementById("saveRecipeButton"),
+    quelleInputList: document.getElementById("quelleInput") ? document.getElementById("quelleInput").getAttribute("list") : null,
+    datalistOptionen: document.getElementById("quellenListe") ? document.getElementById("quellenListe").children.length : null
   };
 };
