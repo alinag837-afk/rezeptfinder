@@ -1196,12 +1196,3 @@ body.rf205-start #rf205BackupPanel {
 .rezeptkarte, .rezept-detail {
   margin: 14px 0;
 }
-
-/* v3.11 einklappbare Suche */
-.such-accordion{border:1px solid #dbe3ef;border-radius:14px;margin:10px 0;background:#fff;overflow:hidden}
-.such-accordion>summary{cursor:pointer;font-weight:700;padding:12px 14px;background:#f7f9fc;list-style:none}
-.such-accordion>summary::-webkit-details-marker{display:none}
-.such-accordion>summary::after{content:"▾";float:right}
-.such-accordion:not([open])>summary::after{content:"▸"}
-.such-accordion-inhalt{padding:12px 14px}
-#suchTagInput,#suchTagsInput{min-height:120px}
