@@ -11,11 +11,11 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.8";
+const APP_VERSION = "3.9";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
-const SUPABASE_URL = "https://oxsuwvbfzijbzffkaqeg.supabase.co";
-const SUPABASE_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+const SUPABASE_URL = "https://pkobmwkljznvhmlrnfqb.supabase.co";
+const SUPABASE_KEY = "sb_publishable_BLAWDMMEdsmaGSEUjXcVTA_J19pb-Oe";
 
 const KATEGORIEN = [
   "Nicht zugeordnet",
@@ -2203,5 +2203,64 @@ window.rf38Diagnose = function() {
     saveButtonGefunden: !!document.getElementById("saveRecipeButton"),
     quelleInputList: document.getElementById("quelleInput") ? document.getElementById("quelleInput").getAttribute("list") : null,
     datalistOptionen: document.getElementById("quellenListe") ? document.getElementById("quellenListe").children.length : null
+  };
+};
+
+
+// =====================================================
+// v3.9 Cloud-Key wiederhergestellt + Status korrekt
+// =====================================================
+
+function updateCloudStatusV39() {
+  const el =
+    document.getElementById("cloudStatusText") ||
+    document.getElementById("cloudStatus");
+
+  if (!el) return;
+
+  const hasKey =
+    typeof SUPABASE_KEY !== "undefined" &&
+    SUPABASE_KEY &&
+    !String(SUPABASE_KEY).includes("PASTE_");
+
+  if (!hasKey) {
+    el.textContent = "Nicht eingerichtet";
+    el.style.color = "crimson";
+    return;
+  }
+
+  if (supabaseClient) {
+    el.textContent = "Verbunden";
+    el.style.color = "green";
+    return;
+  }
+
+  el.textContent = "Bereit zum Verbinden";
+  el.style.color = "#b8860b";
+}
+
+const oldCloudInitV39 = window.cloudInit || cloudInit;
+
+window.cloudInit = function(...args) {
+  const result = oldCloudInitV39.apply(this, args);
+  setTimeout(updateCloudStatusV39, 20);
+  return result;
+};
+
+try {
+  cloudInit = window.cloudInit;
+} catch(e) {}
+
+window.addEventListener("load", function() {
+  updateCloudStatusV39();
+  setTimeout(updateCloudStatusV39, 100);
+  setTimeout(updateCloudStatusV39, 500);
+});
+
+window.rf39Diagnose = function() {
+  return {
+    supabaseUrl: SUPABASE_URL,
+    keyVorhanden: !!SUPABASE_KEY && !String(SUPABASE_KEY).includes("PASTE_"),
+    status: document.getElementById("cloudStatusText") ? document.getElementById("cloudStatusText").textContent : null
   };
 };
