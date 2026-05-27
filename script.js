@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.2";
+const APP_VERSION = "3.4";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://oxsuwvbfzijbzffkaqeg.supabase.co";
@@ -1216,3 +1216,469 @@ window.addEventListener("load", function() {
   setTimeout(bindStartButtonsV32, 1000);
 });
 
+
+
+// =====================================================
+// v3.3 Tag-Mehrfachauswahl + Suche repariert
+// =====================================================
+
+function getSelectedTagsV33() {
+  const el = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  if (!el) return [];
+
+  if (el.tagName && el.tagName.toLowerCase() === "select") {
+    return Array.from(el.selectedOptions || [])
+      .map(option => normalizeTag(option.value || option.textContent || ""))
+      .filter(Boolean);
+  }
+
+  return String(el.value || "")
+    .split(",")
+    .map(normalizeTag)
+    .filter(Boolean);
+}
+
+function updateTagAndSourceOptionsV33() {
+  const sources = [...new Set(rezepte.map(r => r.quelle).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "de"));
+
+  const sourceSelect = document.getElementById("suchQuelleInput");
+  if (sourceSelect) {
+    const current = sourceSelect.value || "";
+    sourceSelect.innerHTML =
+      `<option value="">Alle Quellen</option>` +
+      sources.map(s => `<option value="${esc(s)}"${s === current ? " selected" : ""}>${esc(s)}</option>`).join("");
+  }
+
+  const tags = [...new Set(rezepte.flatMap(r => Array.isArray(r.tags) ? r.tags : []))]
+    .map(normalizeTag)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "de"));
+
+  const tagSelect = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  if (tagSelect) {
+    const selected = new Set(getSelectedTagsV33());
+
+    tagSelect.setAttribute("multiple", "multiple");
+    tagSelect.multiple = true;
+    tagSelect.size = Math.min(Math.max(tags.length || 1, 4), 10);
+
+    tagSelect.innerHTML = tags.map(tag =>
+      `<option value="${esc(tag)}"${selected.has(tag) ? " selected" : ""}>${esc(tag)}</option>`
+    ).join("");
+  }
+}
+
+function rezeptSucheAusfuehrenV33() {
+  const nameQ = val("suchNameInput").toLowerCase();
+  const zutQ = val("suchZutatenInput").toLowerCase();
+  const selectedTags = getSelectedTagsV33();
+  const quelleQ = val("suchQuelleInput").toLowerCase();
+  const status = val("suchAusprobiertInput");
+
+  const cats = Array.from(document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel.aktiv"))
+    .map(el => el.dataset.kategorie || "")
+    .filter(Boolean);
+
+  let results = rezepte.map((r, index) => ({ ...r, index }));
+
+  results = results.filter(r => {
+    const recipeTags = Array.isArray(r.tags)
+      ? r.tags.map(normalizeTag)
+      : String(r.tags || "").split(",").map(normalizeTag).filter(Boolean);
+
+    const tagOk =
+      !selectedTags.length ||
+      selectedTags.some(tag => recipeTags.includes(tag));
+
+    const nameOk = !nameQ || String(r.name || "").toLowerCase().includes(nameQ);
+    const zutOk = !zutQ || ingredientText(r).includes(zutQ);
+    const quelleOk = !quelleQ || String(r.quelle || "").toLowerCase().includes(quelleQ);
+    const statusOk = !status || String(!!r.ausprobiert) === status;
+    const catOk = !cats.length || cats.includes(r.kategorie);
+
+    return nameOk && zutOk && tagOk && quelleOk && statusOk && catOk;
+  });
+
+  zeigeSuchErgebnisse(sortRecipes(results));
+  return false;
+}
+
+function rezeptSucheToggleV33() {
+  updateTagAndSourceOptionsV33();
+  bereichAnzeigen("rezeptSucheBereich");
+  return false;
+}
+
+// Überschreiben der v3.2 Funktionen
+window.rezeptSucheAusfuehren = rezeptSucheAusfuehrenV33;
+window.filterAnwenden = function() {
+  zeigeSuchErgebnisse(sortRecipes(rezepte.map((r, index) => ({ ...r, index }))));
+  return false;
+};
+window.rezeptSucheToggle = rezeptSucheToggleV33;
+window.updateTagAndSourceOptions = updateTagAndSourceOptionsV33;
+
+try {
+  rezeptSucheAusfuehren = rezeptSucheAusfuehrenV33;
+  filterAnwenden = window.filterAnwenden;
+  rezeptSucheToggle = rezeptSucheToggleV33;
+  updateTagAndSourceOptions = updateTagAndSourceOptionsV33;
+} catch(e) {}
+
+function bindSearchButtonsV33() {
+  const searchOpen = document.getElementById("rf207RezepteSuchen");
+  if (searchOpen) {
+    searchOpen.type = "button";
+    searchOpen.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return rezeptSucheToggleV33();
+    };
+  }
+
+  document.querySelectorAll("button").forEach(button => {
+    const text = (button.textContent || "").trim().toLowerCase();
+    const onclick = button.getAttribute("onclick") || "";
+
+    if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) {
+      button.type = "button";
+      button.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return rezeptSucheAusfuehrenV33();
+      };
+    }
+
+    if (text === "alle anzeigen" || onclick.includes("filterAnwenden")) {
+      button.type = "button";
+      button.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return window.filterAnwenden();
+      };
+    }
+  });
+}
+
+window.addEventListener("load", function() {
+  updateTagAndSourceOptionsV33();
+  bindSearchButtonsV33();
+  setTimeout(updateTagAndSourceOptionsV33, 300);
+  setTimeout(bindSearchButtonsV33, 300);
+  setTimeout(bindSearchButtonsV33, 1000);
+});
+
+window.rf33Diagnose = function() {
+  return {
+    rezepte: rezepte.length,
+    tags: [...new Set(rezepte.flatMap(r => Array.isArray(r.tags) ? r.tags : []))],
+    selectedTags: getSelectedTagsV33(),
+    suchTagMultiple: !!(document.getElementById("suchTagInput") && document.getElementById("suchTagInput").multiple)
+  };
+};
+
+
+// =====================================================
+// v3.4 Alle Rezepte eigenständig + Startseite sauber + Rezepte prüfen vollständig
+// =====================================================
+
+function clearResultsV34() {
+  const output = document.getElementById("ergebnisse");
+  if (output) {
+    output.innerHTML = "";
+    output.hidden = true;
+    output.style.display = "none";
+    output.classList.add("versteckt");
+  }
+}
+
+function showResultsV34(results) {
+  const output = document.getElementById("ergebnisse");
+  if (!output) return;
+
+  output.hidden = false;
+  output.style.display = "";
+  output.classList.remove("versteckt");
+
+  if (!results.length) {
+    output.innerHTML = "<p>Keine Rezepte gefunden.</p>";
+    return;
+  }
+
+  output.innerHTML = results.map(r => `
+    <div class="rezeptkarte box">
+      <h3>${esc(r.name)}</h3>
+      <p><strong>Kategorie:</strong> ${esc(r.kategorie || "Nicht zugeordnet")}</p>
+      ${r.quelle ? `<p><strong>Quelle:</strong> ${esc(r.quelle)}</p>` : ""}
+      ${r.portionen ? `<p><strong>Portionen:</strong> ${esc(r.portionen)}</p>` : ""}
+      <div class="button-gruppe">
+        <button type="button" onclick="rezeptAnzeigen(${r.index})">Ansehen</button>
+        <button type="button" onclick="rezeptBearbeiten(${r.index})">Bearbeiten</button>
+        <button type="button" onclick="rezeptLoeschen(${r.index})">Löschen</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+// Alle Rezepte anzeigen: eigene Funktion, keine Suchfilter, immer A-Z.
+// Öffnet nur die Ergebnisliste, nicht den Suche-Bereich.
+function alleRezepteAnzeigenV34() {
+  alleHauptbereicheVerstecken();
+
+  const results = sortRecipes(rezepte.map((r, index) => ({ ...r, index })));
+  letzteSuchErgebnisse = results;
+
+  showResultsV34(results);
+  return false;
+}
+
+// Rezepte suchen: öffnet nur die Suchmaske, zeigt noch keine Rezepte unten an.
+function rezeptSucheToggleV34() {
+  clearResultsV34();
+  bereichAnzeigen("rezeptSucheBereich");
+
+  if (typeof updateTagAndSourceOptionsV33 === "function") {
+    updateTagAndSourceOptionsV33();
+  } else if (typeof updateTagAndSourceOptions === "function") {
+    updateTagAndSourceOptions();
+  }
+
+  return false;
+}
+
+// Suche: nur wenn man wirklich auf Suchen klickt.
+function rezeptSucheAusfuehrenV34() {
+  const nameQ = val("suchNameInput").toLowerCase();
+  const zutQ = val("suchZutatenInput").toLowerCase();
+  const selectedTags = typeof getSelectedTagsV33 === "function" ? getSelectedTagsV33() : [];
+  const quelleQ = val("suchQuelleInput").toLowerCase();
+  const status = val("suchAusprobiertInput");
+
+  const cats = Array.from(document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel.aktiv"))
+    .map(el => el.dataset.kategorie || "")
+    .filter(Boolean);
+
+  let results = rezepte.map((r, index) => ({ ...r, index }));
+
+  results = results.filter(r => {
+    const recipeTags = Array.isArray(r.tags)
+      ? r.tags.map(normalizeTag)
+      : String(r.tags || "").split(",").map(normalizeTag).filter(Boolean);
+
+    const tagOk = !selectedTags.length || selectedTags.some(tag => recipeTags.includes(tag));
+    const nameOk = !nameQ || String(r.name || "").toLowerCase().includes(nameQ);
+    const zutOk = !zutQ || ingredientText(r).includes(zutQ);
+    const quelleOk = !quelleQ || String(r.quelle || "").toLowerCase().includes(quelleQ);
+    const statusOk = !status || String(!!r.ausprobiert) === status;
+    const catOk = !cats.length || cats.includes(r.kategorie);
+
+    return nameOk && zutOk && tagOk && quelleOk && statusOk && catOk;
+  });
+
+  results = sortRecipes(results);
+  letzteSuchErgebnisse = results;
+  showResultsV34(results);
+  return false;
+}
+
+// Datenprüfung wieder vollständig
+function datenqualitaetPruefenV34() {
+  const pruefbereich = document.getElementById("datenpruefungBereich");
+  const output = document.getElementById("datenpruefungInhalt") || document.getElementById("ergebnisse");
+
+  if (pruefbereich) {
+    pruefbereich.hidden = false;
+    pruefbereich.style.display = "";
+    pruefbereich.classList.remove("versteckt");
+  }
+
+  if (!output) return false;
+
+  const problems = rezepte.map((r, index) => {
+    const p = [];
+
+    if (!String(r.name || "").trim()) p.push("Name fehlt");
+    if (!String(r.kategorie || "").trim()) p.push("Kategorie fehlt");
+    if (!String(r.portionen || "").trim()) p.push("Grundportionen fehlen");
+    if (!Array.isArray(r.zutaten) || r.zutaten.length === 0) p.push("Zutaten fehlen");
+    if (!Array.isArray(r.zutatenGruppen) || r.zutatenGruppen.length === 0) p.push("Zutatengruppen fehlen");
+    if (!String(r.zubereitung || "").trim()) p.push("Zubereitung fehlt");
+    if (!Array.isArray(r.utensilien) || r.utensilien.length === 0) p.push("Utensilien fehlen");
+    if (!String(r.quelle || "").trim()) p.push("Quelle fehlt");
+    if (!Array.isArray(r.tags) || r.tags.length === 0) p.push("Tags fehlen");
+
+    const n = r.naehrwerte || {};
+    if (!String(n.kalorien || "").trim()) p.push("Kalorien fehlen");
+    if (!String(n.eiweiss || "").trim()) p.push("Eiweiß fehlt");
+    if (!String(n.kohlenhydrate || "").trim()) p.push("Kohlenhydrate fehlen");
+    if (!String(n.fett || "").trim()) p.push("Fett fehlt");
+
+    return { r, index, p };
+  }).filter(x => x.p.length);
+
+  output.hidden = false;
+  output.style.display = "";
+  output.classList.remove("versteckt");
+
+  if (!problems.length) {
+    output.innerHTML = "<p>Alle Rezepte sind vollständig.</p>";
+    return false;
+  }
+
+  output.innerHTML = problems.map(x => `
+    <div class="box">
+      <h3>${esc(x.r.name || "Unbenanntes Rezept")}</h3>
+      <p><strong>Fehlende Punkte:</strong></p>
+      <ul>${x.p.map(problem => `<li>${esc(problem)}</li>`).join("")}</ul>
+      <button type="button" onclick="rezeptBearbeiten(${x.index})">Bearbeiten</button>
+      <button type="button" onclick="rezeptAnzeigen(${x.index})">Ansehen</button>
+    </div>
+  `).join("");
+
+  return false;
+}
+
+function datenpruefungToggleV34() {
+  clearResultsV34();
+  alleHauptbereicheVerstecken();
+  const bereich = document.getElementById("datenpruefungBereich");
+  if (bereich) {
+    bereich.hidden = false;
+    bereich.style.display = "";
+    bereich.classList.remove("versteckt");
+  }
+  return datenqualitaetPruefenV34();
+}
+
+// Startbuttons neu verbinden und unerwünschte Ergebnisliste verhindern.
+function bindButtonsV34() {
+  const searchBtn = document.getElementById("rf207RezepteSuchen");
+  if (searchBtn) {
+    searchBtn.type = "button";
+    searchBtn.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return rezeptSucheToggleV34();
+    };
+  }
+
+  const allBtn = document.getElementById("rf207AlleRezepte");
+  if (allBtn) {
+    allBtn.type = "button";
+    allBtn.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return alleRezepteAnzeigenV34();
+    };
+  }
+
+  const checkBtn = document.getElementById("rf207RezeptePruefen");
+  if (checkBtn) {
+    checkBtn.type = "button";
+    checkBtn.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return datenpruefungToggleV34();
+    };
+  }
+
+  const assistantBtn = document.getElementById("rf207RezeptAssistent");
+  if (assistantBtn) {
+    assistantBtn.type = "button";
+    assistantBtn.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      clearResultsV34();
+      return textImportToggle();
+    };
+  }
+
+  const addBtn = document.getElementById("rf207RezeptHinzufuegen");
+  if (addBtn) {
+    addBtn.type = "button";
+    addBtn.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      clearResultsV34();
+      return neuesRezeptOeffnen();
+    };
+  }
+
+  document.querySelectorAll("button").forEach(button => {
+    const text = (button.textContent || "").trim().toLowerCase();
+    const onclick = button.getAttribute("onclick") || "";
+
+    if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) {
+      button.type = "button";
+      button.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return rezeptSucheAusfuehrenV34();
+      };
+    }
+
+    if (text === "alle anzeigen" || onclick.includes("filterAnwenden")) {
+      button.type = "button";
+      button.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return alleRezepteAnzeigenV34();
+      };
+    }
+  });
+}
+
+// Globale Funktionen überschreiben
+window.alleRezepteAnzeigen = alleRezepteAnzeigenV34;
+window.alleRezepteStartAnzeigen = alleRezepteAnzeigenV34;
+window.rezeptSucheToggle = rezeptSucheToggleV34;
+window.rezeptSucheAusfuehren = rezeptSucheAusfuehrenV34;
+window.filterAnwenden = alleRezepteAnzeigenV34;
+window.datenqualitaetPruefen = datenqualitaetPruefenV34;
+window.datenpruefungToggle = datenpruefungToggleV34;
+
+try {
+  alleRezepteAnzeigen = alleRezepteAnzeigenV34;
+  alleRezepteStartAnzeigen = alleRezepteAnzeigenV34;
+  rezeptSucheToggle = rezeptSucheToggleV34;
+  rezeptSucheAusfuehren = rezeptSucheAusfuehrenV34;
+  filterAnwenden = alleRezepteAnzeigenV34;
+  datenqualitaetPruefen = datenqualitaetPruefenV34;
+  datenpruefungToggle = datenpruefungToggleV34;
+} catch(e) {}
+
+window.addEventListener("load", function() {
+  bindButtonsV34();
+  setTimeout(bindButtonsV34, 300);
+  setTimeout(bindButtonsV34, 1000);
+});
+
+window.rf34Diagnose = function() {
+  return {
+    rezepte: rezepte.length,
+    alleRezepteButton: !!document.getElementById("rf207AlleRezepte"),
+    sucheButton: !!document.getElementById("rf207RezepteSuchen"),
+    pruefenButton: !!document.getElementById("rf207RezeptePruefen")
+  };
+};
