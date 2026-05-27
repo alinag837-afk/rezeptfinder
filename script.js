@@ -32962,3 +32962,148 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.43 Fix: wirklich nur EIN Löschbutton pro Zutatenzeile
+// Entfernt alte v2.39/v2.41 Buttons und alle übrigen 🗑-Buttons.
+// =====================================================
+
+(function () {
+  function isDeleteButton(btn) {
+    if (!btn) return false;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+    const cls = btn.className || "";
+    const title = (btn.title || "").toLowerCase();
+
+    return (
+      text === "🗑" ||
+      text === "x" ||
+      text === "×" ||
+      text.includes("löschen") ||
+      text.includes("loeschen") ||
+      title.includes("zutat löschen") ||
+      title.includes("zutat loeschen") ||
+      String(cls).includes("zutat-loeschen") ||
+      String(cls).includes("zutat-löschen") ||
+      String(cls).includes("rf239-zutat-loeschen") ||
+      String(cls).includes("rf241-zutat-loeschen") ||
+      String(cls).includes("rf243-zutat-loeschen")
+    );
+  }
+
+  function normalizeIngredientDeleteButtons() {
+    document.querySelectorAll("#zutatenGruppen .zutaten-zeile, #zutatenGruppen .zutat-zeile").forEach(row => {
+      // Alle vorhandenen Löschbuttons in dieser Zeile entfernen, egal aus welcher alten Version.
+      Array.from(row.querySelectorAll("button")).forEach(btn => {
+        if (isDeleteButton(btn)) btn.remove();
+      });
+
+      // Genau einen neuen Button hinzufügen.
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "rf243-zutat-loeschen";
+      btn.textContent = "🗑";
+      btn.title = "Zutat löschen";
+
+      btn.onclick = function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const group = row.closest(".zutatengruppe");
+        row.remove();
+
+        if (group) {
+          const remaining = group.querySelectorAll(".zutaten-zeile, .zutat-zeile");
+          const groups = Array.from(document.querySelectorAll("#zutatenGruppen .zutatengruppe"));
+
+          if (!remaining.length && groups.indexOf(group) > 0) {
+            group.remove();
+          }
+        }
+
+        return false;
+      };
+
+      row.appendChild(btn);
+    });
+  }
+
+  let scheduled = false;
+
+  function scheduleNormalize() {
+    if (scheduled) return;
+
+    scheduled = true;
+    setTimeout(() => {
+      scheduled = false;
+      normalizeIngredientDeleteButtons();
+    }, 60);
+  }
+
+  function startObserver() {
+    const container = document.getElementById("zutatenGruppen");
+    if (!container || container.dataset.rf243Observer === "1") return;
+
+    container.dataset.rf243Observer = "1";
+
+    const observer = new MutationObserver(scheduleNormalize);
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  // Nach jeder bekannten Zutaten-/Gruppen-Aktion aufräumen
+  const oldGroupAdd = window.zutatenGruppeHinzufuegen;
+  if (typeof oldGroupAdd === "function") {
+    window.zutatenGruppeHinzufuegen = function() {
+      const result = oldGroupAdd.apply(this, arguments);
+      setTimeout(normalizeIngredientDeleteButtons, 80);
+      setTimeout(normalizeIngredientDeleteButtons, 300);
+      return result;
+    };
+
+    try { zutatenGruppeHinzufuegen = window.zutatenGruppeHinzufuegen; } catch(e) {}
+  }
+
+  const oldZutatAdd = window.zutatZeileHinzufuegen;
+  if (typeof oldZutatAdd === "function") {
+    window.zutatZeileHinzufuegen = function() {
+      const result = oldZutatAdd.apply(this, arguments);
+      setTimeout(normalizeIngredientDeleteButtons, 80);
+      setTimeout(normalizeIngredientDeleteButtons, 300);
+      return result;
+    };
+
+    try { zutatZeileHinzufuegen = window.zutatZeileHinzufuegen; } catch(e) {}
+  }
+
+  window.rf243NormalizeIngredientDeleteButtons = normalizeIngredientDeleteButtons;
+
+  window.addEventListener("load", function() {
+    startObserver();
+    normalizeIngredientDeleteButtons();
+
+    setTimeout(normalizeIngredientDeleteButtons, 200);
+    setTimeout(normalizeIngredientDeleteButtons, 700);
+    setTimeout(normalizeIngredientDeleteButtons, 1500);
+    setTimeout(startObserver, 1500);
+  });
+
+  document.addEventListener("click", function() {
+    setTimeout(normalizeIngredientDeleteButtons, 100);
+  }, true);
+
+  window.rf243Diagnose = function() {
+    return Array.from(document.querySelectorAll("#zutatenGruppen .zutaten-zeile, #zutatenGruppen .zutat-zeile")).map((row, index) => ({
+      zeile: index + 1,
+      buttons: Array.from(row.querySelectorAll("button")).map(btn => ({
+        text: (btn.textContent || "").trim(),
+        className: btn.className
+      }))
+    }));
+  };
+})();

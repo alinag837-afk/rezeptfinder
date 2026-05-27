@@ -1164,3 +1164,9 @@ body.rf205-start #rf205BackupPanel {
   gap: 8px;
   margin-top: 16px;
 }
+
+
+/* VERSION 2.43 genau ein Zutaten-Löschbutton */
+.rf243-zutat-loeschen {
+  margin-left: 8px;
+}
