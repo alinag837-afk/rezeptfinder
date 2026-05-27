@@ -28975,3 +28975,201 @@ window.addEventListener("load", function () {
     setTimeout(rf221Bind, 1200);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.22 Einfacher Cloud-Backup Toggle
+// Dieser Block überschreibt die kaputten v2.18-v2.21 Toggle-Wrapper.
+// Der Startbereich "Was möchtest du tun?" wird nie versteckt.
+// =====================================================
+
+(function () {
+  let rf222Open = false;
+  let rf222LoadedOnce = false;
+  let rf222BackupHtml = "";
+
+  function rf222FindActionGroup() {
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const marker = buttons.find(btn => {
+      const t = (btn.textContent || "").trim().toLowerCase();
+      return t === "cloud-backups anzeigen";
+    });
+    return marker ? marker.parentElement : null;
+  }
+
+  function rf222EnsureBox() {
+    let box = document.getElementById("rf222BackupBox");
+    if (box) return box;
+
+    box = document.createElement("section");
+    box.id = "rf222BackupBox";
+    box.className = "box versteckt";
+    box.innerHTML = `<h2>Cloud-Backups</h2><div id="rf222BackupContent"></div>`;
+
+    const group = rf222FindActionGroup();
+    if (group && group.parentElement) {
+      group.parentElement.insertBefore(box, group.nextSibling);
+    } else {
+      document.body.appendChild(box);
+    }
+
+    return box;
+  }
+
+  function rf222FindOldBackupContent() {
+    const ids = [
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups",
+      "backupBereich"
+    ];
+
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el && el.id !== "rf222BackupBox") return el;
+    }
+
+    return null;
+  }
+
+  function rf222KeepStartVisible() {
+    // Wichtig: Start/Aktionsbereich nie verstecken.
+    document.body.classList.remove("rf205-start", "rf196-startseite", "startseite-clean");
+
+    const actionGroup = rf222FindActionGroup();
+    if (actionGroup) {
+      actionGroup.hidden = false;
+      actionGroup.style.display = "";
+      actionGroup.classList.remove("versteckt");
+
+      if (actionGroup.parentElement) {
+        actionGroup.parentElement.hidden = false;
+        actionGroup.parentElement.style.display = "";
+        actionGroup.parentElement.classList.remove("versteckt");
+      }
+    }
+  }
+
+  async function rf222LoadBackupsIntoBox() {
+    const box = rf222EnsureBox();
+    const content = document.getElementById("rf222BackupContent");
+    if (!content) return;
+
+    content.innerHTML = "<p>Cloud-Backups werden geladen ...</p>";
+
+    // Originale Funktion genau einmal ausführen, aber ihre Ausgabe danach in unsere Box übernehmen.
+    const originals = [
+      "cloudBackupsAnzeigen_original",
+      "cloudBackupAnzeigen_original",
+      "backupsAnzeigen_original",
+      "zeigeCloudBackups_original"
+    ];
+
+    let called = false;
+
+    for (const name of originals) {
+      try {
+        if (typeof window[name] === "function") {
+          await window[name]();
+          called = true;
+          break;
+        }
+      } catch (e) {
+        console.error("Backup Originalfehler:", e);
+      }
+    }
+
+    // Wenn alte Funktion einen Bereich befüllt hat, Inhalt übernehmen und alten Bereich verstecken.
+    setTimeout(() => {
+      const old = rf222FindOldBackupContent();
+
+      if (old && old !== box && old.innerHTML.trim()) {
+        rf222BackupHtml = old.innerHTML;
+        content.innerHTML = rf222BackupHtml;
+        old.hidden = true;
+        old.style.display = "none";
+        old.classList.add("versteckt");
+      } else if (!called) {
+        content.innerHTML = "<p>Keine Backup-Anzeige gefunden.</p>";
+      } else if (!content.innerHTML.trim() || content.textContent.includes("werden geladen")) {
+        content.innerHTML = rf222BackupHtml || "<p>Backups wurden geladen.</p>";
+      }
+
+      rf222KeepStartVisible();
+    }, 400);
+  }
+
+  function rf222Close() {
+    const box = rf222EnsureBox();
+    box.hidden = true;
+    box.style.display = "none";
+    box.classList.add("versteckt");
+    rf222Open = false;
+    rf222KeepStartVisible();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return false;
+  }
+
+  function rf222OpenBox() {
+    const box = rf222EnsureBox();
+    box.hidden = false;
+    box.style.display = "";
+    box.classList.remove("versteckt");
+
+    rf222Open = true;
+    rf222KeepStartVisible();
+
+    if (!rf222LoadedOnce) {
+      rf222LoadedOnce = true;
+      rf222LoadBackupsIntoBox();
+    }
+
+    box.scrollIntoView({ behavior: "smooth", block: "start" });
+    return false;
+  }
+
+  function rf222Toggle() {
+    const box = rf222EnsureBox();
+    const visible = rf222Open || (!box.hidden && box.style.display !== "none" && !box.classList.contains("versteckt"));
+    return visible ? rf222Close() : rf222OpenBox();
+  }
+
+  // Alle kaputten Toggle-Funktionen überschreiben.
+  window.rf222ToggleBackups = rf222Toggle;
+  window.rf221ToggleBackups = rf222Toggle;
+  window.rf220ToggleBackups = rf222Toggle;
+  window.rf218ToggleBackups = rf222Toggle;
+  window.cloudBackupsAnzeigen = rf222Toggle;
+  window.cloudBackupAnzeigen = rf222Toggle;
+  window.backupsAnzeigen = rf222Toggle;
+  window.zeigeCloudBackups = rf222Toggle;
+
+  function rf222BindButton() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      if (text === "cloud-backups anzeigen" || text === "cloud backups anzeigen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf222Toggle();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function () {
+    rf222EnsureBox();
+    rf222BindButton();
+    rf222KeepStartVisible();
+
+    setTimeout(rf222BindButton, 300);
+    setTimeout(rf222BindButton, 1000);
+    setTimeout(rf222BindButton, 2000);
+  });
+})();

@@ -1099,3 +1099,14 @@ body.rf205-start #rf205BackupPanel {
   border-radius: 10px;
   font-size: 0.95rem;
 }
+
+
+/* VERSION 2.22 Backup-Anzeige einfach und sicher */
+#rf222BackupBox.versteckt {
+  display: none !important;
+}
+
+#rf222BackupBox {
+  display: block;
+  margin-top: 16px;
+}
