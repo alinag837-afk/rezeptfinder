@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.10";
+const APP_VERSION = "3.12";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://pkobmwkljznvhmlrnfqb.supabase.co";
@@ -2399,6 +2399,392 @@ window.rf310Diagnose = function() {
       vorhanden: !!btn,
       hatOnclick: !!(btn && btn.onclick),
       text: btn ? btn.textContent.trim() : ""
+    };
+  });
+};
+
+// =====================================================
+// v3.11 Suche: Filter einklappbar + Tags Mehrfachauswahl
+// =====================================================
+
+function getSelectedTagsV311() {
+  const el = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  if (!el) return [];
+  if (el.tagName && el.tagName.toLowerCase() === "select") {
+    return Array.from(el.selectedOptions || []).map(o => normalizeTag(o.value || o.textContent || "")).filter(Boolean);
+  }
+  return String(el.value || "").split(",").map(normalizeTag).filter(Boolean);
+}
+
+function setupTagMultiSelectV311() {
+  const tagSelect = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  if (!tagSelect) return;
+  tagSelect.multiple = true;
+  tagSelect.setAttribute("multiple", "multiple");
+  tagSelect.size = Math.min(Math.max(tagSelect.options ? tagSelect.options.length : 4, 4), 10);
+  if (!document.getElementById("tagMehrfachHinweis")) {
+    const hint = document.createElement("p");
+    hint.id = "tagMehrfachHinweis";
+    hint.className = "hinweis";
+    hint.textContent = "Mehrere Tags auswählen: Strg/⌘ gedrückt halten und Tags anklicken.";
+    tagSelect.parentElement && tagSelect.parentElement.appendChild(hint);
+  }
+}
+
+function updateTagAndSourceOptionsV311() {
+  const sources = [...new Set(rezepte.map(r => r.quelle).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"de",{sensitivity:"base"}));
+  const sourceSelect = document.getElementById("suchQuelleInput");
+  if (sourceSelect) {
+    const current = sourceSelect.value || "";
+    sourceSelect.innerHTML = `<option value="">Alle Quellen</option>` + sources.map(q => `<option value="${esc(q)}"${q === current ? " selected" : ""}>${esc(q)}</option>`).join("");
+  }
+  const selected = new Set(getSelectedTagsV311());
+  const tags = [...new Set(rezepte.flatMap(r => Array.isArray(r.tags) ? r.tags : []))].map(normalizeTag).filter(Boolean).sort((a,b)=>a.localeCompare(b,"de",{sensitivity:"base"}));
+  const tagSelect = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  if (tagSelect) {
+    tagSelect.multiple = true;
+    tagSelect.setAttribute("multiple", "multiple");
+    tagSelect.size = Math.min(Math.max(tags.length || 4, 4), 10);
+    tagSelect.innerHTML = tags.map(tag => `<option value="${esc(tag)}"${selected.has(tag) ? " selected" : ""}>${esc(tag)}</option>`).join("");
+  }
+  setupTagMultiSelectV311();
+}
+
+function ensureSearchAccordionV311() {
+  const searchArea = document.getElementById("rezeptSucheBereich") || document.getElementById("sucheBereich");
+  if (!searchArea || searchArea.dataset.rf311Accordion === "1") return;
+  searchArea.dataset.rf311Accordion = "1";
+
+  function wrap(el, title, open=false) {
+    if (!el || el.closest(".such-accordion")) return;
+    const details = document.createElement("details");
+    details.className = "such-accordion";
+    if (open) details.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = title;
+    const content = document.createElement("div");
+    content.className = "such-accordion-inhalt";
+    el.parentNode.insertBefore(details, el);
+    details.appendChild(summary);
+    details.appendChild(content);
+    content.appendChild(el);
+  }
+
+  const zutaten = document.getElementById("suchZutatenInput");
+  const tags = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  const quelle = document.getElementById("suchQuelleInput");
+  const status = document.getElementById("suchAusprobiertInput");
+  const sortierung = document.getElementById("suchSortierungInput") || document.getElementById("sortierungInput");
+  const kategorien = document.getElementById("suchKategorieKacheln");
+
+  wrap(zutaten && (zutaten.closest(".form-group") || zutaten.parentElement || zutaten), "Zutaten");
+  wrap(tags && (tags.closest(".form-group") || tags.parentElement || tags), "Tags");
+  wrap(quelle && (quelle.closest(".form-group") || quelle.parentElement || quelle), "Quellen");
+  wrap(kategorien, "Kategorien");
+  wrap(status && (status.closest(".form-group") || status.parentElement || status), "Status");
+  wrap(sortierung && (sortierung.closest(".form-group") || sortierung.parentElement || sortierung), "Sortierung");
+  setupTagMultiSelectV311();
+}
+
+function rezeptSucheAusfuehrenV311() {
+  const nameQ = val("suchNameInput").toLowerCase();
+  const zutQ = val("suchZutatenInput").toLowerCase();
+  const selectedTags = getSelectedTagsV311();
+  const quelleQ = val("suchQuelleInput").toLowerCase();
+  const status = val("suchAusprobiertInput");
+  const sortierung = val("suchSortierungInput") || val("sortierungInput") || "name";
+  const cats = Array.from(document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel.aktiv")).map(el => el.dataset.kategorie || "").filter(Boolean);
+
+  let results = rezepte.map((r, index) => ({ ...r, index })).filter(r => {
+    const recipeTags = Array.isArray(r.tags) ? r.tags.map(normalizeTag) : String(r.tags || "").split(",").map(normalizeTag).filter(Boolean);
+    return (!nameQ || String(r.name || "").toLowerCase().includes(nameQ)) &&
+      (!zutQ || ingredientText(r).includes(zutQ)) &&
+      (!selectedTags.length || selectedTags.some(tag => recipeTags.includes(tag))) &&
+      (!quelleQ || String(r.quelle || "").toLowerCase().includes(quelleQ)) &&
+      (!status || status === "alle" || String(!!r.ausprobiert) === status) &&
+      (!cats.length || cats.includes(r.kategorie));
+  });
+
+  if (sortierung === "kategorie") results.sort((a,b)=>String(a.kategorie||"").localeCompare(String(b.kategorie||""),"de",{sensitivity:"base"}));
+  else if (sortierung === "quelle") results.sort((a,b)=>String(a.quelle||"").localeCompare(String(b.quelle||""),"de",{sensitivity:"base"}));
+  else if (sortierung === "neu") results.sort((a,b)=>String(b.aktualisiertAm||b.erstelltAm||"").localeCompare(String(a.aktualisiertAm||a.erstelltAm||"")));
+  else results = sortRecipes(results);
+
+  letzteSuchErgebnisse = results;
+  if (typeof showResultsV34 === "function") showResultsV34(results);
+  else zeigeSuchErgebnisse(results);
+  return false;
+}
+
+function rezeptSucheToggleV311() {
+  if (typeof clearResultsV34 === "function") clearResultsV34();
+  updateTagAndSourceOptionsV311();
+  bereichAnzeigen("rezeptSucheBereich");
+  setTimeout(ensureSearchAccordionV311, 50);
+  return false;
+}
+
+window.rezeptSucheToggle = rezeptSucheToggleV311;
+window.rezeptSucheAusfuehren = rezeptSucheAusfuehrenV311;
+window.updateTagAndSourceOptions = updateTagAndSourceOptionsV311;
+try {
+  rezeptSucheToggle = rezeptSucheToggleV311;
+  rezeptSucheAusfuehren = rezeptSucheAusfuehrenV311;
+  updateTagAndSourceOptions = updateTagAndSourceOptionsV311;
+} catch(e) {}
+
+function bindSearchV311() {
+  ensureSearchAccordionV311();
+  updateTagAndSourceOptionsV311();
+  const searchBtn = document.getElementById("rf207RezepteSuchen");
+  if (searchBtn) {
+    searchBtn.type = "button";
+    searchBtn.onclick = function(event) {
+      if (event) { event.preventDefault(); event.stopPropagation(); }
+      return rezeptSucheToggleV311();
+    };
+  }
+  document.querySelectorAll("button").forEach(button => {
+    const text = (button.textContent || "").trim().toLowerCase();
+    const onclick = button.getAttribute("onclick") || "";
+    if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) {
+      button.type = "button";
+      button.onclick = function(event) {
+        if (event) { event.preventDefault(); event.stopPropagation(); }
+        return rezeptSucheAusfuehrenV311();
+      };
+    }
+  });
+}
+
+window.addEventListener("load", function() {
+  bindSearchV311();
+  setTimeout(bindSearchV311, 300);
+  setTimeout(bindSearchV311, 1000);
+});
+
+window.rf311Diagnose = function() {
+  const tagSelect = document.getElementById("suchTagInput") || document.getElementById("suchTagsInput");
+  return {
+    akkordeons: document.querySelectorAll(".such-accordion").length,
+    tagMultiple: tagSelect ? !!tagSelect.multiple : false,
+    selectedTags: getSelectedTagsV311()
+  };
+};
+
+
+// =====================================================
+// v3.12 Zentrale Button-Kontrolle
+// Alle wichtigen Buttons funktionieren auch nach Speichern/Bereichswechsel weiter.
+// =====================================================
+
+function rf312ActionForButton(button) {
+  if (!button) return null;
+
+  const id = button.id || "";
+  const text = (button.textContent || "").trim().toLowerCase();
+  const onclick = button.getAttribute("onclick") || "";
+
+  const byId = {
+    rf207CloudSpeichern: () => cloudSpeichernAlle(),
+    rf207CloudLaden: () => cloudLaden(),
+    rf207CloudBackups: () => cloudBackupsAnzeigen(),
+    rf207BackupDownload: () => backupErstellen(),
+    rf207RezepteSuchen: () => rezeptSucheToggle(),
+    rf207RezeptHinzufuegen: () => neuesRezeptOeffnen(),
+    rf207AlleRezepte: () => alleRezepteAnzeigen(),
+    rf207Einkaufsliste: () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      bereichAnzeigen("einkaufBereich");
+      einkaufslisteErstellen();
+      return false;
+    },
+    rf207RezeptAssistent: () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      return textImportToggle();
+    },
+    rf207RezeptePruefen: () => datenpruefungToggle(),
+    saveRecipeButton: () => rezeptSpeichern(),
+    rezeptAnalysierenButton: () => rezeptAnalysierenDirekt()
+  };
+
+  if (byId[id]) return byId[id];
+
+  if (text === "rezept speichern" || text === "speichern" || onclick.includes("rezeptSpeichern")) {
+    return () => rezeptSpeichern();
+  }
+
+  if (text === "rezept analysieren" || onclick.includes("rf153AssistentVorschau") || onclick.includes("rezeptAnalysierenDirekt")) {
+    return () => rezeptAnalysierenDirekt();
+  }
+
+  if (text === "rezept-assistent" || text === "rezept assistent") {
+    return () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      return textImportToggle();
+    };
+  }
+
+  if (text === "rezepte suchen") return () => rezeptSucheToggle();
+  if (text === "alle rezepte anzeigen" || text === "alle anzeigen") return () => alleRezepteAnzeigen();
+  if (text === "rezept hinzufügen" || text === "rezept hinzufuegen") return () => neuesRezeptOeffnen();
+  if (text === "einkaufsliste") {
+    return () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      bereichAnzeigen("einkaufBereich");
+      einkaufslisteErstellen();
+      return false;
+    };
+  }
+  if (text === "rezepte prüfen" || text === "rezepte pruefen") return () => datenpruefungToggle();
+  if (text === "jetzt in cloud speichern") return () => cloudSpeichernAlle();
+  if (text === "aus cloud laden") return () => cloudLaden();
+  if (text === "cloud-backups anzeigen") return () => cloudBackupsAnzeigen();
+  if (text === "manuelles backup herunterladen") return () => backupErstellen();
+
+  if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) {
+    return () => rezeptSucheAusfuehren();
+  }
+
+  if (text === "suche zurücksetzen" || text === "suche zuruecksetzen" || onclick.includes("sucheZuruecksetzen")) {
+    return () => sucheZuruecksetzen();
+  }
+
+  if (text === "kategorien zurücksetzen" || text === "kategorien zuruecksetzen" || onclick.includes("kategorienAufAlleSetzen")) {
+    return () => kategorienAufAlleSetzen();
+  }
+
+  if (text === "einkaufsliste zurücksetzen" || text === "einkaufsliste zuruecksetzen" || onclick.includes("einkaufslisteZuruecksetzen")) {
+    return () => einkaufslisteZuruecksetzen();
+  }
+
+  if (text.includes("drucken") || onclick.includes("einkaufslisteDrucken")) {
+    return () => einkaufslisteDrucken();
+  }
+
+  if (text.includes("assistent") && text.includes("zurück") || onclick.includes("rezeptAssistentZuruecksetzen")) {
+    return () => rezeptAssistentZuruecksetzen();
+  }
+
+  return null;
+}
+
+function rf312RunAction(action, event) {
+  if (!action) return false;
+
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
+  }
+
+  try {
+    return action();
+  } catch (error) {
+    console.error("Button-Fehler v3.12:", error);
+    alert("Diese Funktion konnte nicht ausgeführt werden: " + (error.message || "unbekannter Fehler"));
+    return false;
+  }
+}
+
+function bindAllButtonsV312() {
+  document.querySelectorAll("button").forEach(button => {
+    const action = rf312ActionForButton(button);
+    if (!action) return;
+
+    button.type = "button";
+    button.removeAttribute("onclick");
+    button.onclick = function(event) {
+      return rf312RunAction(action, event);
+    };
+  });
+}
+
+// Capture-Delegation: greift auch, wenn Buttons später neu erzeugt werden.
+document.addEventListener("click", function(event) {
+  const button = event.target && event.target.closest ? event.target.closest("button") : null;
+  if (!button) return;
+
+  const action = rf312ActionForButton(button);
+  if (!action) return;
+
+  return rf312RunAction(action, event);
+}, true);
+
+// Nach allen wichtigen Änderungen neu binden.
+const rf312OldZurUebersicht = window.zurUebersicht || zurUebersicht;
+window.zurUebersicht = function() {
+  const result = rf312OldZurUebersicht.apply(this, arguments);
+  setTimeout(bindAllButtonsV312, 50);
+  setTimeout(bindAllButtonsV312, 300);
+  return result;
+};
+try { zurUebersicht = window.zurUebersicht; } catch(e) {}
+
+const rf312OldFormularLeeren = window.formularLeeren || formularLeeren;
+window.formularLeeren = function() {
+  const result = rf312OldFormularLeeren.apply(this, arguments);
+  setTimeout(bindAllButtonsV312, 50);
+  setTimeout(bindAllButtonsV312, 300);
+  return result;
+};
+try { formularLeeren = window.formularLeeren; } catch(e) {}
+
+const rf312OldRezeptSpeichern = window.rezeptSpeichern || rezeptSpeichern;
+window.rezeptSpeichern = function() {
+  const result = rf312OldRezeptSpeichern.apply(this, arguments);
+  setTimeout(bindAllButtonsV312, 50);
+  setTimeout(bindAllButtonsV312, 300);
+  setTimeout(bindAllButtonsV312, 1000);
+  return result;
+};
+try { rezeptSpeichern = window.rezeptSpeichern; } catch(e) {}
+
+const rf312OldTextImportToggle = window.textImportToggle || textImportToggle;
+window.textImportToggle = function() {
+  const result = rf312OldTextImportToggle.apply(this, arguments);
+  setTimeout(bindAllButtonsV312, 50);
+  setTimeout(bindAllButtonsV312, 300);
+  return result;
+};
+try { textImportToggle = window.textImportToggle; } catch(e) {}
+
+window.bindAllButtonsV312 = bindAllButtonsV312;
+
+window.addEventListener("load", function() {
+  bindAllButtonsV312();
+  setTimeout(bindAllButtonsV312, 100);
+  setTimeout(bindAllButtonsV312, 500);
+  setTimeout(bindAllButtonsV312, 1500);
+  setTimeout(bindAllButtonsV312, 3000);
+});
+
+window.rf312Diagnose = function() {
+  const important = [
+    "rf207CloudSpeichern",
+    "rf207CloudLaden",
+    "rf207CloudBackups",
+    "rf207BackupDownload",
+    "rf207RezepteSuchen",
+    "rf207RezeptHinzufuegen",
+    "rf207AlleRezepte",
+    "rf207Einkaufsliste",
+    "rf207RezeptAssistent",
+    "rf207RezeptePruefen",
+    "saveRecipeButton",
+    "rezeptAnalysierenButton"
+  ];
+
+  return important.map(id => {
+    const button = document.getElementById(id);
+    return {
+      id,
+      vorhanden: !!button,
+      text: button ? button.textContent.trim() : "",
+      hatAktion: !!(button && rf312ActionForButton(button)),
+      hatOnclick: !!(button && button.onclick)
     };
   });
 };
