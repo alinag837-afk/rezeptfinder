@@ -31853,3 +31853,367 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.38 Assistent: Zutaten-Gruppen + Einheiten-Dropdowns wiederherstellen
+// =====================================================
+
+(function () {
+  const EINHEITEN_238 = (typeof EINHEITEN !== "undefined" && Array.isArray(EINHEITEN))
+    ? EINHEITEN
+    : ["","mg","g","dag","kg","ml","cl","dl","l","TL","EL","Stk.","Prise","Becher","Tasse","Päckchen","Dose","Glas","Bund","Zweig","Blatt","Scheibe","Würfel","Messerspitze","Spritzer","Handvoll"];
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function clean(line) {
+    return String(line || "")
+      .replace(/^[•\-\u2022]\s*/, "")
+      .replace(/^\d+\.\s*/, "")
+      .trim();
+  }
+
+  function unitOptions(selected) {
+    const selectedNorm = String(selected || "").trim().toLowerCase();
+    const all = [...EINHEITEN_238];
+
+    if (selected && !all.some(e => String(e).toLowerCase() === selectedNorm)) {
+      all.push(selected);
+    }
+
+    return all.map(e => {
+      const isSelected = String(e).toLowerCase() === selectedNorm ? " selected" : "";
+      return `<option value="${esc(e)}"${isSelected}>${esc(e)}</option>`;
+    }).join("");
+  }
+
+  function parseIngredient(line) {
+    const text = clean(line);
+    const m = text.match(/^(\d+(?:[,.]\d+)?(?:\s*-\s*\d+(?:[,.]\d+)?)?)\s*([a-zA-ZäöüÄÖÜß.]+)?\s+(.+)$/);
+
+    if (m) {
+      return {
+        menge: m[1].replace(",", ".").trim(),
+        einheit: (m[2] || "").trim(),
+        name: (m[3] || "").trim()
+      };
+    }
+
+    return { menge: "", einheit: "", name: text };
+  }
+
+  function sectionOf(line) {
+    const l = clean(line).toLowerCase();
+    if (/^quelle\b/.test(l)) return "quelle";
+    if (/^portionen?\b/.test(l)) return "portionen";
+    if (/^zutaten\b/.test(l)) return "zutaten";
+    if (/^zubereitung\b/.test(l)) return "zubereitung";
+    if (/^utensilien\b/.test(l)) return "utensilien";
+    if (/^nährwerte\b|^naehrwerte\b/.test(l)) return "naehrwerte";
+    if (/^notizen?\b/.test(l)) return "notizen";
+    return "";
+  }
+
+  function extractQuelle(line) {
+    const m = line.match(/^Quelle\s*:\s*(.+)$/i);
+    return m ? m[1].trim() : "";
+  }
+
+  function parseAssistentText238(text) {
+    const lines = String(text || "").split(/\r?\n/).map(clean).filter(Boolean);
+
+    const recipe = {
+      name: lines[0] || "",
+      quelle: "",
+      portionen: "",
+      zutatenGruppen: [],
+      zubereitung: [],
+      utensilien: [],
+      notizen: "",
+      naehrwerteText: ""
+    };
+
+    let section = "";
+    let currentGroup = null;
+
+    function ensureGroup(name) {
+      currentGroup = { name: name || "Zutaten", zutaten: [] };
+      recipe.zutatenGruppen.push(currentGroup);
+      return currentGroup;
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      const sec = sectionOf(line);
+
+      if (sec) {
+        section = sec;
+
+        const quelle = extractQuelle(line);
+        if (quelle) recipe.quelle = quelle;
+
+        // Portionen können auch in derselben Zeile stehen
+        const pm = line.match(/^Portionen?\s*:\s*(.+)$/i);
+        if (pm) {
+          const num = pm[1].match(/\d+(?:[,.]\d+)?/);
+          recipe.portionen = num ? num[0].replace(",", ".") : pm[1].trim();
+        }
+
+        if (sec === "naehrwerte") recipe.naehrwerteText += " " + line;
+        continue;
+      }
+
+      if (section === "quelle") {
+        recipe.quelle = line.replace(/^Quelle\s*:\s*/i, "").trim();
+        continue;
+      }
+
+      if (section === "portionen") {
+        const num = line.match(/\d+(?:[,.]\d+)?/);
+        recipe.portionen = num ? num[0].replace(",", ".") : line;
+        continue;
+      }
+
+      if (section === "zutaten") {
+        if (/^für\s+/i.test(line)) {
+          ensureGroup(line.replace(/^für\s+/i, "").trim());
+          continue;
+        }
+
+        if (!currentGroup) ensureGroup("Zutaten");
+        currentGroup.zutaten.push(parseIngredient(line));
+        continue;
+      }
+
+      if (section === "zubereitung") {
+        recipe.zubereitung.push(line);
+        continue;
+      }
+
+      if (section === "utensilien") {
+        recipe.utensilien.push(line);
+        continue;
+      }
+
+      if (section === "naehrwerte") {
+        recipe.naehrwerteText += " " + line;
+        continue;
+      }
+
+      if (section === "notizen") {
+        recipe.notizen += (recipe.notizen ? "\n" : "") + line;
+      }
+    }
+
+    if (!recipe.zutatenGruppen.length) {
+      recipe.zutatenGruppen = [{ name: "Zutaten", zutaten: [] }];
+    }
+
+    return recipe;
+  }
+
+  function parseNaehrwerte238(text) {
+    const t = String(text || "").replace(/\n/g, " ");
+    function get(regex) {
+      const m = t.match(regex);
+      return m ? m[1].replace(",", ".") : "";
+    }
+    return {
+      kalorien: get(/(\d+(?:[,.]\d+)?)\s*kcal/i),
+      eiweiss: get(/(\d+(?:[,.]\d+)?)\s*g\s*(?:eiweiß|eiweiss|protein)/i),
+      kohlenhydrate: get(/(\d+(?:[,.]\d+)?)\s*g\s*kohlenhydrate/i),
+      fett: get(/(\d+(?:[,.]\d+)?)\s*g\s*fett/i),
+      zucker: get(/(\d+(?:[,.]\d+)?)\s*g\s*zucker/i),
+      ballaststoffe: get(/(\d+(?:[,.]\d+)?)\s*g\s*ballaststoffe/i),
+      salz: get(/(\d+(?:[,.]\d+)?)\s*g\s*salz/i)
+    };
+  }
+
+  function fillForm238(recipe) {
+    if ($("nameInput")) $("nameInput").value = recipe.name || "";
+    if ($("quelleInput")) $("quelleInput").value = recipe.quelle || "";
+    if ($("portionenInput")) $("portionenInput").value = recipe.portionen || "";
+    if ($("zubereitungInput")) $("zubereitungInput").value = (recipe.zubereitung || []).join("\n");
+    if ($("utensilienInput")) $("utensilienInput").value = (recipe.utensilien || []).join(", ");
+    if ($("notizenInput")) $("notizenInput").value = recipe.notizen || "";
+
+    const n = parseNaehrwerte238(recipe.naehrwerteText || "");
+    if ($("kalorienInput")) $("kalorienInput").value = n.kalorien || "";
+    if ($("eiweissInput")) $("eiweissInput").value = n.eiweiss || "";
+    if ($("kohlenhydrateInput")) $("kohlenhydrateInput").value = n.kohlenhydrate || "";
+    if ($("fettInput")) $("fettInput").value = n.fett || "";
+    if ($("zuckerInput")) $("zuckerInput").value = n.zucker || "";
+    if ($("ballaststoffeInput")) $("ballaststoffeInput").value = n.ballaststoffe || "";
+    if ($("salzInput")) $("salzInput").value = n.salz || "";
+
+    const container = $("zutatenGruppen");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    (recipe.zutatenGruppen || []).forEach((gruppe, gi) => {
+      const group = document.createElement("div");
+      group.className = "zutatengruppe";
+      group.innerHTML = `
+        <input type="text" class="zutaten-gruppenname" value="${esc(gruppe.name || (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1)))}">
+        <div class="zutaten-zeilen"></div>
+      `;
+
+      const rows = group.querySelector(".zutaten-zeilen");
+
+      (gruppe.zutaten || []).forEach(z => {
+        const row = document.createElement("div");
+        row.className = "zutaten-zeile zutat-zeile";
+        row.innerHTML = `
+          <input type="text" class="zutat-menge" placeholder="Menge" value="${esc(z.menge)}">
+          <select class="zutat-einheit">${unitOptions(z.einheit)}</select>
+          <input type="text" class="zutat-name" placeholder="Zutat" value="${esc(z.name)}">
+        `;
+        rows.appendChild(row);
+      });
+
+      container.appendChild(group);
+    });
+  }
+
+  function previewHtml238(recipe) {
+    const groups = (recipe.zutatenGruppen || []).map(g => `
+      <h4>${esc(g.name)}</h4>
+      <ul>${(g.zutaten || []).map(z => `<li>${esc([z.menge, z.einheit, z.name].filter(Boolean).join(" "))}</li>`).join("")}</ul>
+    `).join("");
+
+    return `
+      <div class="box">
+        <h3>${esc(recipe.name || "Unbenanntes Rezept")}</h3>
+        <p><strong>Quelle:</strong> ${esc(recipe.quelle || "")}</p>
+        <p><strong>Portionen:</strong> ${esc(recipe.portionen || "")}</p>
+        <h4>Zutaten</h4>
+        ${groups}
+        <h4>Zubereitung</h4>
+        <p>${esc((recipe.zubereitung || []).join(" "))}</p>
+        <button type="button" id="rf238InsFormularButton">Ins Formular übernehmen</button>
+      </div>
+    `;
+  }
+
+  function analyze238() {
+    const input = $("textImportInput");
+    const preview = $("assistentVorschau");
+
+    if (!input || !preview) return false;
+
+    const recipe = parseAssistentText238(input.value);
+    window.rf238AssistentRecipe = recipe;
+
+    preview.innerHTML = previewHtml238(recipe);
+    preview.hidden = false;
+    preview.style.display = "";
+    preview.classList.remove("versteckt");
+
+    const btn = $("rf238InsFormularButton");
+    if (btn) {
+      btn.onclick = function() {
+        fillForm238(window.rf238AssistentRecipe || recipe);
+
+        const assistent = $("textImportBereich");
+        if (assistent) {
+          assistent.hidden = true;
+          assistent.style.display = "none";
+          assistent.classList.add("versteckt");
+        }
+
+        preview.innerHTML = "";
+        input.value = "";
+
+        const form = $("formularBereich");
+        if (form) {
+          form.hidden = false;
+          form.style.display = "";
+          form.classList.remove("versteckt");
+          form.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+
+        return false;
+      };
+    }
+
+    return false;
+  }
+
+  function upgradeExistingUnits238() {
+    document.querySelectorAll("#zutatenGruppen .zutat-einheit").forEach(el => {
+      if (el.tagName && el.tagName.toLowerCase() === "select") return;
+      const value = el.value || "";
+      const select = document.createElement("select");
+      select.className = el.className || "zutat-einheit";
+      select.innerHTML = unitOptions(value);
+      el.replaceWith(select);
+    });
+  }
+
+  // Globale Assistent-Funktionen überschreiben
+  window.rf238AssistentAnalysieren = analyze238;
+  window.rf226AssistentAnalysieren = analyze238;
+  window.rf153AssistentVorschau = analyze238;
+  window.rezeptAnalysierenDirektFinal = analyze238;
+  window.rezeptAnalysierenDirekt = analyze238;
+
+  try {
+    rf153AssistentVorschau = analyze238;
+    rezeptAnalysierenDirektFinal = analyze238;
+    rezeptAnalysierenDirekt = analyze238;
+  } catch(e) {}
+
+  function bind238() {
+    const btn = $("rezeptAnalysierenButton");
+    if (btn) {
+      btn.type = "button";
+      btn.onclick = function(event) {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        return analyze238();
+      };
+    }
+
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+      if (text === "rezept analysieren") {
+        button.type = "button";
+        button.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return analyze238();
+        };
+      }
+    });
+
+    upgradeExistingUnits238();
+  }
+
+  window.addEventListener("load", function() {
+    bind238();
+    setTimeout(bind238, 300);
+    setTimeout(bind238, 1000);
+    setTimeout(upgradeExistingUnits238, 1500);
+  });
+
+  window.rf238Diagnose = function() {
+    return {
+      einheitenDropdowns: Array.from(document.querySelectorAll("#zutatenGruppen .zutat-einheit")).map(el => el.tagName),
+      gruppen: Array.from(document.querySelectorAll("#zutatenGruppen .zutatengruppe")).length
+    };
+  };
+})();
