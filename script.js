@@ -28199,3 +28199,140 @@ window.addEventListener("load", function () {
     setTimeout(rf216BindButtons, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.17 Fix: Cloud-Synchronisation Laptop ↔ Handy
+// Upload nach Rezept-Speichern wieder erlauben,
+// aber ohne Endlos-Loop.
+// =====================================================
+
+(function () {
+  let rf217CloudBusy = false;
+  let rf217LastUpload = 0;
+
+  async function rf217CloudUpload(reason) {
+    const now = Date.now();
+
+    // Nur echte Doppelklicks/Loops blockieren
+    if (rf217CloudBusy) return false;
+    if (now - rf217LastUpload < 2500) {
+      console.warn("Doppelter Cloud-Upload blockiert:", reason);
+      return false;
+    }
+
+    rf217CloudBusy = true;
+    rf217LastUpload = now;
+
+    try {
+      // Immer die echte Uploadfunktion verwenden
+      if (typeof window.rf215CloudSpeichernOriginal === "function") {
+        return await window.rf215CloudSpeichernOriginal();
+      }
+
+      // Alte funktionierende Funktion sichern falls noch nicht vorhanden
+      const fn =
+        window.rf215CloudSpeichern ||
+        window.cloudSpeichernAlleDirekt ||
+        window.cloudSpeichernAlle;
+
+      if (typeof fn === "function") {
+        window.rf215CloudSpeichernOriginal = fn;
+        return await fn();
+      }
+
+      console.error("Keine Cloud-Uploadfunktion gefunden.");
+      return false;
+    } catch (e) {
+      console.error("Cloud Upload Fehler:", e);
+      return false;
+    } finally {
+      setTimeout(() => {
+        rf217CloudBusy = false;
+      }, 2000);
+    }
+  }
+
+  // Manueller Button → immer Upload
+  function rf217ManualUpload() {
+    return rf217CloudUpload("manual");
+  }
+
+  // Nach Rezept speichern → genau einmal Upload
+  function rf217RecipeSavedUpload() {
+    return rf217CloudUpload("recipe-save");
+  }
+
+  // Alte kaputte Blockierer entfernen
+  window.rf216ManualCloudUpload = rf217ManualUpload;
+  window.rf216AfterRecipeSaveUpload = rf217RecipeSavedUpload;
+
+  // Wichtig:
+  // NICHT mehr blockieren.
+  window.cloudSpeichernAlle = rf217ManualUpload;
+  window.cloudSpeichernAlleDirekt = rf217ManualUpload;
+  window.cloudSpeichernAlleDirekt1294 = rf217ManualUpload;
+
+  try {
+    cloudSpeichernAlle = rf217ManualUpload;
+    cloudSpeichernAlleDirekt = rf217ManualUpload;
+    cloudSpeichernAlleDirekt1294 = rf217ManualUpload;
+  } catch(e) {}
+
+  // Rezept speichern -> einmal Cloud Upload
+  function rf217WrapSave(name) {
+    const oldFn = window[name];
+    if (typeof oldFn !== "function" || oldFn.__rf217Wrapped) return;
+
+    const wrapped = function () {
+      const result = oldFn.apply(this, arguments);
+
+      setTimeout(() => {
+        rf217RecipeSavedUpload();
+      }, 700);
+
+      return result;
+    };
+
+    wrapped.__rf217Wrapped = true;
+    window[name] = wrapped;
+
+    try { globalThis[name] = wrapped; } catch(e) {}
+  }
+
+  [
+    "rf214RezeptSpeichern",
+    "rf213RezeptSpeichern",
+    "rf212RezeptSpeichern",
+    "rezeptSpeichern",
+    "rezeptSpeichernDirektCloud",
+    "rf155RezeptSpeichern"
+  ].forEach(rf217WrapSave);
+
+  function rf217BindButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (
+        text === "jetzt in cloud speichern" ||
+        text.includes("cloud speichern")
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf217ManualUpload();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    rf217BindButtons();
+    setTimeout(rf217BindButtons, 500);
+    setTimeout(rf217BindButtons, 1500);
+  });
+})();
