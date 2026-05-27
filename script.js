@@ -28813,3 +28813,165 @@ window.addEventListener("load", function () {
     setTimeout(rf220Bind, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.21 Fix: "Was möchtest du tun?" bleibt sichtbar
+// =====================================================
+
+(function () {
+
+  function rf221Hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = "none";
+    el.classList.add("versteckt");
+  }
+
+  function rf221Show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+  }
+
+  function rf221FindBackupArea() {
+    const ids = [
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups",
+      "backupBereich"
+    ];
+
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) return el;
+    }
+
+    return null;
+  }
+
+  function rf221RestoreOverview() {
+
+    // Nur Backup-Bereiche schließen
+    [
+      "backupBereich",
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups"
+    ].forEach(id => rf221Hide(document.getElementById(id)));
+
+    const backup = rf221FindBackupArea();
+    rf221Hide(backup);
+
+    // WICHTIG:
+    // NICHT mehr den Aktionsbereich verstecken.
+    // "Was möchtest du tun?" bleibt sichtbar.
+    [
+      "dashboardBereich",
+      "startBereich",
+      "uebersichtBereich",
+      "aktionenBereich"
+    ].forEach(id => rf221Show(document.getElementById(id)));
+
+    // Ergebnisse weiterhin ausblenden
+    const ergebnisse = document.getElementById("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      rf221Hide(ergebnisse);
+    }
+
+    document.body.classList.add(
+      "rf205-start",
+      "rf196-startseite",
+      "startseite-clean"
+    );
+
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch(e) {}
+  }
+
+  function rf221ToggleBackups() {
+    const area = rf221FindBackupArea();
+
+    const open = area &&
+      !area.hidden &&
+      area.style.display !== "none" &&
+      !area.classList.contains("versteckt");
+
+    // Wenn offen -> nur schließen
+    if (open) {
+      rf221RestoreOverview();
+      return false;
+    }
+
+    // Originalfunktion verwenden
+    const originals = [
+      "cloudBackupsAnzeigen_original",
+      "cloudBackupAnzeigen_original",
+      "backupsAnzeigen_original",
+      "zeigeCloudBackups_original"
+    ];
+
+    for (const name of originals) {
+      try {
+        if (typeof window[name] === "function") {
+          window[name]();
+          return true;
+        }
+      } catch(e) {}
+    }
+
+    if (area) rf221Show(area);
+    return true;
+  }
+
+  window.rf221ToggleBackups = rf221ToggleBackups;
+
+  [
+    "cloudBackupsAnzeigen",
+    "cloudBackupAnzeigen",
+    "backupsAnzeigen",
+    "zeigeCloudBackups"
+  ].forEach(name => {
+    if (typeof window[name] === "function" && !window[name + "_original"]) {
+      window[name + "_original"] = window[name];
+    }
+
+    window[name] = rf221ToggleBackups;
+  });
+
+  function rf221Bind() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (
+        text === "cloud-backups anzeigen" ||
+        text === "cloud backups anzeigen"
+      ) {
+        btn.type = "button";
+
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+
+          return rf221ToggleBackups();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    rf221Bind();
+    setTimeout(rf221Bind, 400);
+    setTimeout(rf221Bind, 1200);
+  });
+})();
