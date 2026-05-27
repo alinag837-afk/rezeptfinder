@@ -33385,3 +33385,69 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.45
+// Entfernt ALLE nachträglich erzeugten Zutaten-Löschbuttons.
+// Lässt nur den ursprünglichen Original-Button stehen.
+// =====================================================
+
+(function () {
+
+  function isInjectedDeleteButton(btn) {
+    if (!btn) return false;
+
+    const cls = String(btn.className || "");
+    const text = (btn.textContent || "").trim();
+
+    return (
+      cls.includes("rf239-zutat-loeschen") ||
+      cls.includes("rf241-zutat-loeschen") ||
+      cls.includes("rf243-zutat-loeschen") ||
+      text === "🗑"
+    );
+  }
+
+  function cleanupDeleteButtons245() {
+    document.querySelectorAll("#zutatenGruppen .zutaten-zeile, #zutatenGruppen .zutat-zeile").forEach(row => {
+
+      // Nur künstlich hinzugefügte Buttons entfernen
+      Array.from(row.querySelectorAll("button")).forEach(btn => {
+        if (isInjectedDeleteButton(btn)) {
+          btn.remove();
+        }
+      });
+
+    });
+  }
+
+  // MutationObserver nur noch zum Aufräumen verwenden
+  function startCleanupObserver245() {
+    const container = document.getElementById("zutatenGruppen");
+    if (!container || container.dataset.rf245Observer === "1") return;
+
+    container.dataset.rf245Observer = "1";
+
+    const observer = new MutationObserver(() => {
+      setTimeout(cleanupDeleteButtons245, 20);
+    });
+
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  window.addEventListener("load", function() {
+    cleanupDeleteButtons245();
+    startCleanupObserver245();
+
+    setTimeout(cleanupDeleteButtons245, 200);
+    setTimeout(cleanupDeleteButtons245, 700);
+    setTimeout(cleanupDeleteButtons245, 1500);
+    setTimeout(cleanupDeleteButtons245, 3000);
+  });
+
+})();
