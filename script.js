@@ -28503,3 +28503,132 @@ window.addEventListener("load", function () {
     setTimeout(rf218BindButton, 1500);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.19 Fix: Nach Cloud-Backups einklappen zurück zur Übersicht
+// =====================================================
+
+(function () {
+  function rf219ZurUebersichtNachBackup() {
+    // Alle Arbeitsbereiche schließen
+    [
+      "formularBereich",
+      "rezeptSucheBereich",
+      "textImportBereich",
+      "einkaufBereich",
+      "datenpruefungBereich",
+      "backupBereich",
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups"
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    // Ergebnisliste leeren und ausblenden, damit keine Rezepte auf der Startseite erscheinen
+    const ergebnisse = document.getElementById("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      ergebnisse.hidden = true;
+      ergebnisse.style.display = "none";
+    }
+
+    // Startseiten-Zustand aktivieren
+    document.body.classList.add("rf205-start");
+    document.body.classList.add("rf196-startseite");
+    document.body.classList.add("startseite-clean");
+
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch(e) {}
+  }
+
+  function rf219FindBackupContainer() {
+    const ids = [
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups",
+      "backupBereich"
+    ];
+
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) return el;
+    }
+
+    return Array.from(document.querySelectorAll("div, section")).find(el => {
+      const txt = (el.textContent || "").toLowerCase();
+      return txt.includes("backup") && el.querySelector("button");
+    }) || null;
+  }
+
+  // Alte v2.18 Togglefunktion gezielt ergänzen:
+  const old218Toggle = window.rf218ToggleBackups;
+
+  window.rf218ToggleBackups = function() {
+    const container = rf219FindBackupContainer();
+    const isOpen = container && !container.hidden && container.style.display !== "none" && !container.classList.contains("versteckt");
+
+    // Wenn offen: schließen UND zurück zur Übersicht
+    if (isOpen) {
+      container.hidden = true;
+      container.style.display = "none";
+      container.classList.add("versteckt");
+      rf219ZurUebersichtNachBackup();
+      return false;
+    }
+
+    // Wenn geschlossen: normale alte Funktion öffnen lassen
+    if (typeof old218Toggle === "function") {
+      return old218Toggle();
+    }
+
+    if (container) {
+      container.hidden = false;
+      container.style.display = "";
+      container.classList.remove("versteckt");
+    }
+
+    return true;
+  };
+
+  // Buttons erneut binden, damit zweiter Klick sauber zur Übersicht geht.
+  function rf219BindBackupButton() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (
+        text === "cloud-backups anzeigen" ||
+        text === "cloud backups anzeigen"
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return window.rf218ToggleBackups();
+        };
+      }
+    });
+  }
+
+  window.rf219ZurUebersichtNachBackup = rf219ZurUebersichtNachBackup;
+
+  window.addEventListener("load", function() {
+    rf219BindBackupButton();
+    setTimeout(rf219BindBackupButton, 500);
+    setTimeout(rf219BindBackupButton, 1500);
+  });
+})();
