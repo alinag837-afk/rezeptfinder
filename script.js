@@ -33451,3 +33451,127 @@ window.addEventListener("load", function () {
   });
 
 })();
+
+
+
+// =====================================================
+// VERSION 2.46
+// "Alle Rezepte anzeigen" immer alphabetisch sortieren
+// =====================================================
+
+(function () {
+
+  function rf246SortRecipesAlphabetically(list) {
+    if (!Array.isArray(list)) return [];
+
+    return [...list].sort((a, b) => {
+      const an = String(a?.name || "").toLocaleLowerCase("de");
+      const bn = String(b?.name || "").toLocaleLowerCase("de");
+
+      return an.localeCompare(bn, "de", {
+        sensitivity: "base",
+        numeric: true
+      });
+    });
+  }
+
+  function rf246ApplyAlphabeticSort() {
+
+    // globale Ergebnislisten sortieren
+    try {
+      if (Array.isArray(window.letzteSuchErgebnisse)) {
+        window.letzteSuchErgebnisse = rf246SortRecipesAlphabetically(window.letzteSuchErgebnisse);
+
+        try { letzteSuchErgebnisse = window.letzteSuchErgebnisse; } catch(e) {}
+      }
+    } catch(e) {}
+
+    // lokale Rezepte sortieren
+    try {
+      const data = JSON.parse(localStorage.getItem("rezepte") || "[]");
+
+      if (Array.isArray(data)) {
+        const sorted = rf246SortRecipesAlphabetically(data);
+
+        window.rezepte = sorted;
+        try { rezepte = sorted; } catch(e) {}
+
+        localStorage.setItem("rezepte", JSON.stringify(sorted));
+        localStorage.setItem("rezepte_rf235_sicherung", JSON.stringify(sorted));
+      }
+    } catch(e) {}
+  }
+
+  // bestehende Funktion erweitern
+  const oldShowAll246 =
+    window.rf237ShowAll ||
+    window.filterAnwenden ||
+    window.rezeptSucheAusfuehren;
+
+  function showAllSorted246() {
+
+    rf246ApplyAlphabeticSort();
+
+    if (typeof oldShowAll246 === "function") {
+      return oldShowAll246.apply(this, arguments);
+    }
+
+    return false;
+  }
+
+  window.rf246ShowAllSorted = showAllSorted246;
+  window.filterAnwenden = showAllSorted246;
+
+  try {
+    filterAnwenden = showAllSorted246;
+  } catch(e) {}
+
+  function bind246() {
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+
+      if (
+        text === "alle rezepte anzeigen" ||
+        text === "alle anzeigen"
+      ) {
+        button.type = "button";
+
+        button.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+
+          return showAllSorted246();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+
+    const text = (button.textContent || "").trim().toLowerCase();
+
+    if (
+      text === "alle rezepte anzeigen" ||
+      text === "alle anzeigen"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      return showAllSorted246();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    rf246ApplyAlphabeticSort();
+
+    bind246();
+
+    setTimeout(bind246, 300);
+    setTimeout(bind246, 1000);
+  });
+
+})();
