@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.1";
+const APP_VERSION = "3.2";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://oxsuwvbfzijbzffkaqeg.supabase.co";
@@ -1145,3 +1145,74 @@ window.rf31Diagnose = function() {
     hatAssistentReset: typeof window.rezeptAssistentZuruecksetzen === "function"
   };
 };
+
+
+// =====================================================
+// v3.2 Startseiten-Buttons verbinden
+// =====================================================
+
+function bindStartButtonsV32() {
+  const bindings = {
+    rf207CloudSpeichern: cloudSpeichernAlle,
+    rf207CloudLaden: cloudLaden,
+    rf207CloudBackups: cloudBackupsAnzeigen,
+    rf207BackupDownload: backupErstellen,
+    rf207RezepteSuchen: rezeptSucheToggle,
+    rf207RezeptHinzufuegen: neuesRezeptOeffnen,
+    rf207AlleRezepte: alleRezepteAnzeigen,
+    rf207Einkaufsliste: function () {
+      bereichAnzeigen("einkaufBereich");
+      einkaufslisteErstellen();
+      return false;
+    },
+    rf207RezeptAssistent: textImportToggle,
+    rf207RezeptePruefen: datenpruefungToggle
+  };
+
+  Object.entries(bindings).forEach(([id, fn]) => {
+    const button = document.getElementById(id);
+    if (!button || typeof fn !== "function") return;
+
+    button.type = "button";
+    button.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return fn();
+    };
+  });
+
+  const saveButton = document.getElementById("saveRecipeButton");
+  if (saveButton) {
+    saveButton.type = "button";
+    saveButton.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return rezeptSpeichern();
+    };
+  }
+
+  const analyzeButton = document.getElementById("rezeptAnalysierenButton");
+  if (analyzeButton) {
+    analyzeButton.type = "button";
+    analyzeButton.onclick = function(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return rezeptAnalysierenDirekt();
+    };
+  }
+}
+
+window.bindStartButtonsV32 = bindStartButtonsV32;
+
+window.addEventListener("load", function() {
+  bindStartButtonsV32();
+  setTimeout(bindStartButtonsV32, 250);
+  setTimeout(bindStartButtonsV32, 1000);
+});
+
