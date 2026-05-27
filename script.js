@@ -31244,3 +31244,480 @@ window.addEventListener("load", function () {
     }
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.32 FINALER PERSISTENZ-FIX
+// Problem: Neues Rezept verschwindet nach Neuladen/Cloud-Laden.
+// Lösung:
+// - Beim Speichern in mehrere lokale Sicherungen schreiben.
+// - Beim Laden der Seite aus der besten lokalen Sicherung wiederherstellen.
+// - Cloud-Laden führt zusammen statt lokale neue Rezepte zu überschreiben.
+// - Speichern aktualisiert localStorage sofort und überprüft danach.
+// =====================================================
+
+(function () {
+  const MAIN_KEY = "rezepte";
+  const MIRROR_KEY = "rezepte_mirror_v232";
+  const BACKUP_KEY = "rezepte_backup_v232";
+  const LAST_SAVE_KEY = "rezepte_last_save_v232";
+  const EDIT_ID_KEY = "rf232_edit_id";
+  const EDIT_INDEX_KEY = "rf232_edit_index";
+
+  let saving = false;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function id() {
+    try {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch(e) {}
+    return "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function parseKey(key) {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function normalizeList(list) {
+    if (!Array.isArray(list)) list = [];
+
+    const out = [];
+    const ids = new Set();
+
+    list.forEach(r => {
+      if (!r || typeof r !== "object") return;
+      if (r.geloescht || r.deleted || r.__deleted || r.id === "__rezeptfinder_deleted_keys__") return;
+
+      if (!r.id) r.id = id();
+
+      // gleiche ID, aber unterschiedlicher Eintrag: ID trennen statt löschen
+      if (ids.has(String(r.id))) r.id = id();
+      ids.add(String(r.id));
+
+      out.push(r);
+    });
+
+    return out;
+  }
+
+  function bestLocalList() {
+    const candidates = [
+      parseKey(MAIN_KEY),
+      parseKey(MIRROR_KEY),
+      parseKey(BACKUP_KEY),
+      parseKey(LAST_SAVE_KEY)
+    ].map(normalizeList);
+
+    candidates.sort((a, b) => b.length - a.length);
+    return candidates[0] || [];
+  }
+
+  function writeAll(list) {
+    list = normalizeList(list);
+
+    const data = JSON.stringify(list);
+
+    localStorage.setItem(MAIN_KEY, data);
+    localStorage.setItem(MIRROR_KEY, data);
+    localStorage.setItem(BACKUP_KEY, data);
+    localStorage.setItem(LAST_SAVE_KEY, data);
+
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+
+    return list;
+  }
+
+  function restoreOnLoad() {
+    const best = bestLocalList();
+    const main = parseKey(MAIN_KEY);
+
+    // Falls Hauptspeicher leer/kleiner ist, aus Sicherung wiederherstellen
+    if (best.length > main.length) {
+      writeAll(best);
+      console.warn("Rezepte aus lokaler Sicherung wiederhergestellt:", best.length);
+    } else {
+      writeAll(main);
+    }
+  }
+
+  function val(idName) {
+    const el = $(idName);
+    return el && typeof el.value !== "undefined" ? String(el.value).trim() : "";
+  }
+
+  function readZutaten() {
+    const container = $("zutatenGruppen");
+    const groups = [];
+
+    if (!container) return { groups, flat: [] };
+
+    let groupEls = Array.from(container.querySelectorAll(".zutatengruppe"));
+    if (!groupEls.length) groupEls = [container];
+
+    groupEls.forEach((g, gi) => {
+      const groupName = g.querySelector(".zutaten-gruppenname")?.value?.trim() || (gi === 0 ? "Zutaten" : "Gruppe " + (gi + 1));
+      let rows = Array.from(g.querySelectorAll(".zutaten-zeile, .zutat-zeile"));
+
+      if (!rows.length) {
+        rows = Array.from(g.querySelectorAll(".zutat-name"))
+          .map(el => el.closest("div") || el.parentElement)
+          .filter(Boolean);
+      }
+
+      const zutaten = [];
+      rows.forEach(row => {
+        const menge = row.querySelector(".zutat-menge")?.value?.trim() || "";
+        const einheit = row.querySelector(".zutat-einheit")?.value?.trim() || "";
+        const name = row.querySelector(".zutat-name")?.value?.trim() || "";
+
+        if (menge || einheit || name) {
+          zutaten.push({ menge, einheit, name });
+        }
+      });
+
+      if (zutaten.length) groups.push({ name: groupName, zutaten });
+    });
+
+    return { groups, flat: groups.flatMap(g => g.zutaten || []) };
+  }
+
+  function currentEdit() {
+    const idValue =
+      sessionStorage.getItem(EDIT_ID_KEY) ||
+      sessionStorage.getItem("rf231_edit_id") ||
+      sessionStorage.getItem("rf223_edit_id") ||
+      sessionStorage.getItem("rf214_edit_id") ||
+      "";
+
+    const raw =
+      sessionStorage.getItem(EDIT_INDEX_KEY) ||
+      sessionStorage.getItem("rf231_edit_index") ||
+      sessionStorage.getItem("rf223_edit_index") ||
+      sessionStorage.getItem("rf214_edit_index");
+
+    let index = raw !== null && raw !== "" ? Number(raw) : null;
+
+    try {
+      if ((index === null || !Number.isInteger(index)) && typeof bearbeitungsIndex === "number") index = bearbeitungsIndex;
+    } catch(e) {}
+
+    if ((index === null || !Number.isInteger(index)) && typeof window.bearbeitungsIndex === "number") {
+      index = window.bearbeitungsIndex;
+    }
+
+    return { id: idValue, index: Number.isInteger(index) ? index : null };
+  }
+
+  function clearEdit() {
+    [EDIT_ID_KEY, EDIT_INDEX_KEY, "rf231_edit_id", "rf231_edit_index", "rf223_edit_id", "rf223_edit_index", "rf214_edit_id", "rf214_edit_index"].forEach(k => {
+      try { sessionStorage.removeItem(k); } catch(e) {}
+    });
+    window.bearbeitungsIndex = null;
+    try { bearbeitungsIndex = null; } catch(e) {}
+    document.body.classList.remove("bearbeitet-modus");
+  }
+
+  function recipeFromForm(existing, isEdit, forcedId) {
+    const z = readZutaten();
+
+    let ausprobiert = existing ? !!existing.ausprobiert : false;
+    const aus = $("ausprobiertInput");
+    if (aus) {
+      ausprobiert = aus.type === "checkbox"
+        ? !!aus.checked
+        : String(aus.value).toLowerCase() === "true" || String(aus.value).toLowerCase().includes("schon");
+    }
+
+    return {
+      id: isEdit ? (forcedId || existing?.id || id()) : id(),
+      name: val("nameInput"),
+      kategorie: val("kategorieInput") || "Nicht zugeordnet",
+      portionen: val("portionenInput"),
+      schwierigkeit: val("schwierigkeitInput"),
+      zubereitungszeit: val("zubereitungszeitInput"),
+      quelle: val("quelleInput"),
+      tags: val("tagsInput").split(",").map(x => x.trim().toLowerCase()).filter(Boolean),
+      zubereitung: val("zubereitungInput"),
+      utensilien: val("utensilienInput").split(",").map(x => x.trim()).filter(Boolean),
+      notizen: val("notizenInput"),
+      naehrwerte: {
+        kalorien: val("kalorienInput"),
+        eiweiss: val("eiweissInput"),
+        kohlenhydrate: val("kohlenhydrateInput"),
+        fett: val("fettInput"),
+        zucker: val("zuckerInput"),
+        ballaststoffe: val("ballaststoffeInput"),
+        salz: val("salzInput")
+      },
+      zutatenGruppen: z.groups,
+      zutaten: z.flat,
+      ausprobiert,
+      favorit: existing ? !!existing.favorit : false,
+      bewertung: existing ? Number(existing.bewertung || 0) : 0,
+      erstelltAm: existing?.erstelltAm || new Date().toISOString(),
+      aktualisiertAm: new Date().toISOString()
+    };
+  }
+
+  function sig(r) {
+    return [
+      String(r.name || "").trim().toLowerCase(),
+      String(r.kategorie || "").trim().toLowerCase(),
+      String(r.portionen || "").trim(),
+      String(r.quelle || "").trim().toLowerCase(),
+      String(r.zubereitung || "").trim().toLowerCase(),
+      JSON.stringify(r.zutaten || [])
+    ].join("|");
+  }
+
+  function cleanup(list) {
+    list = normalizeList(list);
+
+    // identische Rezepte: neuere/letzte Version behalten
+    const seen = new Set();
+    const cleaned = [];
+
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = sig(list[i]);
+      if (s && seen.has(s)) continue;
+      seen.add(s);
+      cleaned.unshift(list[i]);
+    }
+
+    return cleaned;
+  }
+
+  function closeForm() {
+    ["formularBereich", "rezeptSucheBereich", "sucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(idName => {
+      const el = $(idName);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    const ergebnisse = $("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      ergebnisse.hidden = true;
+      ergebnisse.style.display = "none";
+      ergebnisse.classList.add("versteckt");
+    }
+
+    document.body.classList.add("rf205-start");
+  }
+
+  function saveFinal() {
+    if (saving) return false;
+    saving = true;
+
+    try {
+      let list = bestLocalList();
+      const edit = currentEdit();
+
+      let replaceIndex = -1;
+      if (edit.id) replaceIndex = list.findIndex(r => r && String(r.id) === String(edit.id));
+      if (replaceIndex < 0 && edit.index !== null && list[edit.index]) replaceIndex = edit.index;
+
+      const isEdit = replaceIndex >= 0;
+      const existing = isEdit ? list[replaceIndex] : null;
+      const recipe = recipeFromForm(existing, isEdit, edit.id || existing?.id);
+
+      if (!recipe.name) {
+        alert("Bitte einen Rezeptnamen eingeben.");
+        return false;
+      }
+
+      if (!recipe.zutaten.length) {
+        alert("Bitte mindestens eine Zutat eingeben.");
+        return false;
+      }
+
+      if (!recipe.zubereitung) {
+        alert("Bitte eine Zubereitung eingeben.");
+        return false;
+      }
+
+      if (isEdit) list[replaceIndex] = recipe;
+      else list.push(recipe);
+
+      list = cleanup(list);
+      writeAll(list);
+
+      // Sofort nachprüfen, ob localStorage wirklich geschrieben wurde.
+      const verify = parseKey(MAIN_KEY);
+      if (!verify.some(r => r && r.id === recipe.id)) {
+        throw new Error("Speichern in localStorage wurde nicht bestätigt.");
+      }
+
+      clearEdit();
+
+      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+      if (typeof meldungAnzeigen === "function") meldungAnzeigen("Rezept gespeichert.");
+      else alert("Rezept gespeichert.");
+
+      closeForm();
+
+      return true;
+    } catch(e) {
+      console.error("Speichern v2.32 Fehler:", e);
+      alert("Rezept konnte nicht gespeichert werden: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      setTimeout(() => { saving = false; }, 1200);
+    }
+  }
+
+  function rememberEdit(index) {
+    const list = bestLocalList();
+    const i = Number(index);
+
+    if (Number.isInteger(i) && i >= 0 && i < list.length && list[i]) {
+      if (!list[i].id) list[i].id = id();
+      sessionStorage.setItem(EDIT_INDEX_KEY, String(i));
+      sessionStorage.setItem(EDIT_ID_KEY, String(list[i].id));
+      window.bearbeitungsIndex = i;
+      try { bearbeitungsIndex = i; } catch(e) {}
+      document.body.classList.add("bearbeitet-modus");
+      writeAll(list);
+    }
+  }
+
+  const oldEdit = window.rezeptBearbeiten;
+  window.rezeptBearbeiten = function(index) {
+    rememberEdit(index);
+    if (typeof window.rf212RezeptBearbeiten === "function") return window.rf212RezeptBearbeiten(index);
+    if (typeof oldEdit === "function" && oldEdit !== window.rezeptBearbeiten) return oldEdit(index);
+    return false;
+  };
+
+  // Cloud laden: MERGE statt Überschreiben.
+  const oldCloudLoad = window.cloudLaden;
+  window.cloudLaden = async function() {
+    const before = bestLocalList();
+
+    let result = true;
+    if (typeof oldCloudLoad === "function" && oldCloudLoad !== window.cloudLaden) {
+      result = await oldCloudLoad.apply(this, arguments);
+    }
+
+    setTimeout(() => {
+      const after = parseKey(MAIN_KEY);
+      const map = new Map();
+
+      // Cloud + lokal zusammenführen, lokal nicht verlieren.
+      [...after, ...before].forEach(r => {
+        if (!r) return;
+        if (!r.id) r.id = id();
+        map.set(String(r.id), r);
+      });
+
+      writeAll([...map.values()]);
+      console.log("Cloud-Laden zusammengeführt. Lokal vorher:", before.length, "nachher:", map.size);
+    }, 500);
+
+    return result;
+  };
+
+  window.rf232RezeptSpeichern = saveFinal;
+  window.rf231RezeptSpeichern = saveFinal;
+  window.rezeptSpeichern = saveFinal;
+  window.rezeptSpeichernDirektCloud = saveFinal;
+  window.rf155RezeptSpeichern = saveFinal;
+  window.rf228SaveOnce = saveFinal;
+  window.rf225SaveOnce = saveFinal;
+
+  try {
+    rezeptSpeichern = saveFinal;
+    rezeptSpeichernDirektCloud = saveFinal;
+    rf155RezeptSpeichern = saveFinal;
+    cloudLaden = window.cloudLaden;
+  } catch(e) {}
+
+  function bindButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (text === "rezept speichern" || text === "speichern" || onclick.includes("rezeptSpeichern") || onclick.includes("rf155RezeptSpeichern")) {
+        btn.type = "button";
+        btn.removeAttribute("onclick");
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+          }
+          return saveFinal();
+        };
+      }
+
+      if (text === "aus cloud laden" || onclick.includes("cloudLaden")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return window.cloudLaden();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+    const onclick = btn.getAttribute("onclick") || "";
+
+    if (text === "rezept speichern" || text === "speichern" || onclick.includes("rezeptSpeichern") || onclick.includes("rf155RezeptSpeichern")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      event.stopPropagation();
+      return saveFinal();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    restoreOnLoad();
+    bindButtons();
+    setTimeout(restoreOnLoad, 300);
+    setTimeout(bindButtons, 300);
+    setTimeout(bindButtons, 1000);
+    setTimeout(bindButtons, 2000);
+  });
+
+  window.rf232PersistenzTest = function() {
+    const before = {
+      main: localStorage.getItem(MAIN_KEY),
+      mirror: localStorage.getItem(MIRROR_KEY),
+      backup: localStorage.getItem(BACKUP_KEY),
+      last: localStorage.getItem(LAST_SAVE_KEY)
+    };
+    try {
+      const testRecipe = { id: "rf232_test", name: "Persistenz Test", zutaten: [{menge:"1", einheit:"g", name:"Test"}], zubereitung:"Test" };
+      writeAll([testRecipe]);
+      const restored = bestLocalList();
+      return restored.length === 1 && restored[0].id === "rf232_test";
+    } finally {
+      if (before.main === null) localStorage.removeItem(MAIN_KEY); else localStorage.setItem(MAIN_KEY, before.main);
+      if (before.mirror === null) localStorage.removeItem(MIRROR_KEY); else localStorage.setItem(MIRROR_KEY, before.mirror);
+      if (before.backup === null) localStorage.removeItem(BACKUP_KEY); else localStorage.setItem(BACKUP_KEY, before.backup);
+      if (before.last === null) localStorage.removeItem(LAST_SAVE_KEY); else localStorage.setItem(LAST_SAVE_KEY, before.last);
+      restoreOnLoad();
+    }
+  };
+})();
