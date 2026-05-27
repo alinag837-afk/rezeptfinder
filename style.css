@@ -1138,3 +1138,29 @@ body.rf205-start #rf205BackupPanel {
 .rf241-zutat-loeschen {
   margin-left: 8px;
 }
+
+
+/* VERSION 2.42 Rezept Detailansicht */
+.rf242-detailkarte {
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 14px 0;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+
+.rf242-detailkarte h2 {
+  margin-top: 0;
+}
+
+.rf242-detailkarte h4 {
+  margin-bottom: 6px;
+}
+
+.rf242-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}

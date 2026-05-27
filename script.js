@@ -32753,3 +32753,212 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.42 Fix: Button "Ansehen" funktioniert wieder
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function loadRecipes242() {
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch(e) {
+      list = [];
+    }
+
+    if (!Array.isArray(list)) list = [];
+
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+
+    return list;
+  }
+
+  function zutatenHtml242(rezept) {
+    if (Array.isArray(rezept.zutatenGruppen) && rezept.zutatenGruppen.length) {
+      return rezept.zutatenGruppen.map(g => `
+        <h4>${esc(g.name || "Zutaten")}</h4>
+        <ul>
+          ${(g.zutaten || []).map(z => {
+            if (typeof z === "string") return `<li>${esc(z)}</li>`;
+            return `<li>${esc([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" "))}</li>`;
+          }).join("")}
+        </ul>
+      `).join("");
+    }
+
+    if (Array.isArray(rezept.zutaten) && rezept.zutaten.length) {
+      return `
+        <h4>Zutaten</h4>
+        <ul>
+          ${rezept.zutaten.map(z => {
+            if (typeof z === "string") return `<li>${esc(z)}</li>`;
+            return `<li>${esc([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" "))}</li>`;
+          }).join("")}
+        </ul>
+      `;
+    }
+
+    return "<p>Keine Zutaten gespeichert.</p>";
+  }
+
+  function naehrwerteHtml242(rezept) {
+    const n = rezept.naehrwerte || {};
+    const items = [
+      n.kalorien ? `${esc(n.kalorien)} kcal` : "",
+      n.eiweiss ? `${esc(n.eiweiss)} g Eiweiß` : "",
+      n.kohlenhydrate ? `${esc(n.kohlenhydrate)} g Kohlenhydrate` : "",
+      n.fett ? `${esc(n.fett)} g Fett` : "",
+      n.zucker ? `${esc(n.zucker)} g Zucker` : "",
+      n.ballaststoffe ? `${esc(n.ballaststoffe)} g Ballaststoffe` : "",
+      n.salz ? `${esc(n.salz)} g Salz` : ""
+    ].filter(Boolean);
+
+    if (!items.length) return "";
+
+    return `
+      <h4>Nährwerte pro 100 g</h4>
+      <p>${items.join(" · ")}</p>
+    `;
+  }
+
+  function rezeptAnsehen242(index) {
+    const list = loadRecipes242();
+    const i = Number(index);
+
+    if (!Number.isInteger(i) || i < 0 || i >= list.length || !list[i]) {
+      alert("Rezept wurde nicht gefunden.");
+      return false;
+    }
+
+    const r = list[i];
+    const out = $("ergebnisse");
+
+    if (!out) {
+      alert("Ausgabebereich wurde nicht gefunden.");
+      return false;
+    }
+
+    out.hidden = false;
+    out.style.display = "";
+    out.classList.remove("versteckt");
+
+    ["formularBereich", "rezeptSucheBereich", "sucheBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    const tags = Array.isArray(r.tags) ? r.tags.join(", ") : (r.tags || "");
+    const utensilien = Array.isArray(r.utensilien) ? r.utensilien.join(", ") : (r.utensilien || "");
+
+    out.innerHTML = `
+      <div class="rf242-detailkarte">
+        <h2>${esc(r.name || "Unbenanntes Rezept")}</h2>
+        <p><strong>Kategorie:</strong> ${esc(r.kategorie || "Nicht zugeordnet")}</p>
+        ${r.portionen ? `<p><strong>Portionen:</strong> ${esc(r.portionen)}</p>` : ""}
+        ${r.quelle ? `<p><strong>Quelle:</strong> ${esc(r.quelle)}</p>` : ""}
+        ${r.schwierigkeit ? `<p><strong>Schwierigkeit:</strong> ${esc(r.schwierigkeit)}</p>` : ""}
+        ${r.zubereitungszeit ? `<p><strong>Zeit:</strong> ${esc(r.zubereitungszeit)}</p>` : ""}
+
+        <h3>Zutaten</h3>
+        ${zutatenHtml242(r)}
+
+        <h3>Zubereitung</h3>
+        <p>${esc(r.zubereitung || "").replace(/\n/g, "<br>")}</p>
+
+        ${utensilien ? `<h4>Utensilien</h4><p>${esc(utensilien)}</p>` : ""}
+        ${tags ? `<h4>Tags</h4><p>${esc(tags)}</p>` : ""}
+        ${naehrwerteHtml242(r)}
+        ${r.notizen ? `<h4>Notizen</h4><p>${esc(r.notizen).replace(/\n/g, "<br>")}</p>` : ""}
+
+        <div class="rf242-aktionen">
+          <button type="button" onclick="rezeptBearbeiten(${i})">Bearbeiten</button>
+          <button type="button" onclick="rezeptLoeschen(${i})">Löschen</button>
+          <button type="button" onclick="rezeptSucheAusfuehren()">Zurück zur Suche</button>
+        </div>
+      </div>
+    `;
+
+    try { out.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+
+    return false;
+  }
+
+  window.rezeptAnsehen = rezeptAnsehen242;
+  window.rezeptAnzeigen = rezeptAnsehen242;
+  window.rf242RezeptAnsehen = rezeptAnsehen242;
+
+  try {
+    rezeptAnsehen = rezeptAnsehen242;
+    rezeptAnzeigen = rezeptAnsehen242;
+  } catch(e) {}
+
+  function bindAnsehen242() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (text === "ansehen" || onclick.includes("rezeptAnzeigen") || onclick.includes("rezeptAnsehen")) {
+        const m = onclick.match(/(\d+)/);
+        if (m) {
+          btn.type = "button";
+          btn.onclick = function(event) {
+            if (event) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+            return rezeptAnsehen242(Number(m[1]));
+          };
+        }
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+    const onclick = btn.getAttribute("onclick") || "";
+
+    if (text === "ansehen" && onclick) {
+      const m = onclick.match(/(\d+)/);
+      if (m) {
+        event.preventDefault();
+        event.stopPropagation();
+        return rezeptAnsehen242(Number(m[1]));
+      }
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    bindAnsehen242();
+    setTimeout(bindAnsehen242, 300);
+    setTimeout(bindAnsehen242, 1000);
+    setTimeout(bindAnsehen242, 2000);
+  });
+
+  window.rf242Diagnose = function() {
+    return {
+      rezepte: loadRecipes242().length,
+      ansehenButtons: Array.from(document.querySelectorAll("button")).filter(b => (b.textContent || "").trim().toLowerCase() === "ansehen").length
+    };
+  };
+})();
