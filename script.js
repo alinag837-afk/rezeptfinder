@@ -31249,3 +31249,265 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.36 Fix: Suche findet neu gespeicherte Rezepte wieder
+// Suche liest nur, filtert korrekt und behält den echten Rezept-Index.
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function parseRecipes() {
+    try {
+      const data = JSON.parse(localStorage.getItem("rezepte") || "[]");
+      return Array.isArray(data) ? data.filter(Boolean) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function setGlobalRecipes(list) {
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+  }
+
+  function norm(v) {
+    return String(v || "").toLowerCase().trim();
+  }
+
+  function value(id) {
+    const el = $(id);
+    if (!el) return "";
+
+    if (el.tagName && el.tagName.toLowerCase() === "select" && el.multiple) {
+      return Array.from(el.selectedOptions || []).map(o => o.value || o.textContent || "").join(" ");
+    }
+
+    return String(el.value || "").trim();
+  }
+
+  function ingredientsText(r) {
+    const parts = [];
+
+    if (Array.isArray(r.zutaten)) {
+      r.zutaten.forEach(z => {
+        if (typeof z === "string") parts.push(z);
+        else if (z) parts.push([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" "));
+      });
+    }
+
+    if (Array.isArray(r.zutatenGruppen)) {
+      r.zutatenGruppen.forEach(g => {
+        if (g && g.name) parts.push(g.name);
+        (g.zutaten || []).forEach(z => {
+          if (typeof z === "string") parts.push(z);
+          else if (z) parts.push([z.menge, z.einheit, z.name || z.zutat || z.text].filter(Boolean).join(" "));
+        });
+      });
+    }
+
+    return norm(parts.join(" "));
+  }
+
+  function tagsText(r) {
+    if (Array.isArray(r.tags)) return norm(r.tags.join(" "));
+    return norm(r.tags || "");
+  }
+
+  function selectedCategories() {
+    const active = Array.from(document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel.aktiv, #suchKategorieKacheln .such-kategorie-kachel.aktiv"));
+    const cats = active.map(el => el.dataset?.kategorie || "").filter(Boolean);
+
+    // Wenn Alle aktiv ist, ist dataset leer -> kein Kategorie-Filter.
+    return cats;
+  }
+
+  function matchesStatus(r) {
+    const status = value("suchAusprobiertInput");
+    if (!status) return true;
+
+    if (status === "true") return !!r.ausprobiert;
+    if (status === "false") return !r.ausprobiert;
+
+    return true;
+  }
+
+  function sortResults(results) {
+    const sort = value("suchSortierungInput") || value("sortierungInput") || "name";
+    const list = [...results];
+
+    if (sort === "name") list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "de"));
+    if (sort === "kategorie") list.sort((a, b) => String(a.kategorie || "").localeCompare(String(b.kategorie || ""), "de"));
+    if (sort === "quelle") list.sort((a, b) => String(a.quelle || "").localeCompare(String(b.quelle || ""), "de"));
+    if (sort === "neu") list.sort((a, b) => String(b.aktualisiertAm || b.erstelltAm || "").localeCompare(String(a.aktualisiertAm || a.erstelltAm || "")));
+
+    return list;
+  }
+
+  function searchRecipes236() {
+    const list = parseRecipes();
+    setGlobalRecipes(list);
+
+    const nameQ = norm(value("suchNameInput"));
+    const zutQ = norm(value("suchZutatenInput"));
+    const tagQ = norm(value("suchTagInput") || value("suchTagsInput"));
+    const quelleQ = norm(value("suchQuelleInput"));
+    const cats = selectedCategories();
+
+    let results = list.map((r, index) => ({
+      ...r,
+      index,
+      vorhandene: [],
+      fehlende: []
+    }));
+
+    results = results.filter(r => {
+      const nameOk = !nameQ || norm(r.name).includes(nameQ);
+      const zutOk = !zutQ || ingredientsText(r).includes(zutQ);
+      const tagOk = !tagQ || tagsText(r).includes(tagQ);
+      const quelleOk = !quelleQ || norm(r.quelle).includes(quelleQ);
+      const catOk = !cats.length || cats.includes(r.kategorie || "Nicht zugeordnet");
+      const statusOk = matchesStatus(r);
+
+      return nameOk && zutOk && tagOk && quelleOk && catOk && statusOk;
+    });
+
+    results = sortResults(results);
+    window.letzteSuchErgebnisse = results;
+    try { letzteSuchErgebnisse = results; } catch(e) {}
+
+    const out = $("ergebnisse");
+    if (out) {
+      out.hidden = false;
+      out.style.display = "";
+      out.classList.remove("versteckt");
+    }
+
+    if (typeof zeigeErgebnisse === "function") {
+      zeigeErgebnisse(results);
+    } else if (out) {
+      out.innerHTML = results.map(r => `<div class="rezept"><h3>${r.name || "Unbenanntes Rezept"}</h3><p>${r.kategorie || ""}</p></div>`).join("");
+    }
+
+    const counter = $("suchTrefferAnzeige");
+    if (counter) counter.textContent = results.length + " Treffer";
+
+    console.log("v2.36 Suche:", { gespeichert: list.length, gefunden: results.length, nameQ, zutQ, tagQ, quelleQ, cats });
+    return false;
+  }
+
+  function openSearch236() {
+    document.body.classList.remove("rf205-start", "startseite-clean");
+
+    ["formularBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      el.hidden = true;
+      el.style.display = "none";
+      el.classList.add("versteckt");
+    });
+
+    const search = $("rezeptSucheBereich") || $("sucheBereich");
+    if (search) {
+      search.hidden = false;
+      search.style.display = "";
+      search.classList.remove("versteckt");
+    }
+
+    const out = $("ergebnisse");
+    if (out) {
+      out.hidden = false;
+      out.style.display = "";
+      out.classList.remove("versteckt");
+      out.innerHTML = "";
+    }
+
+    const list = parseRecipes();
+    setGlobalRecipes(list);
+
+    try { if (typeof quellenDropdownAktualisieren === "function") quellenDropdownAktualisieren(); } catch(e) {}
+    try { if (typeof tagsDropdownAktualisieren === "function") tagsDropdownAktualisieren(); } catch(e) {}
+
+    return false;
+  }
+
+  function showAll236() {
+    const list = parseRecipes();
+    setGlobalRecipes(list);
+    const results = sortResults(list.map((r, index) => ({ ...r, index, vorhandene: [], fehlende: [] })));
+
+    const out = $("ergebnisse");
+    if (out) {
+      out.hidden = false;
+      out.style.display = "";
+      out.classList.remove("versteckt");
+    }
+
+    if (typeof zeigeErgebnisse === "function") zeigeErgebnisse(results);
+    return false;
+  }
+
+  window.rezeptSucheAusfuehren = searchRecipes236;
+  window.filterAnwenden = searchRecipes236;
+  window.rf236Search = searchRecipes236;
+  window.rf236ShowAll = showAll236;
+
+  try {
+    rezeptSucheAusfuehren = searchRecipes236;
+    filterAnwenden = searchRecipes236;
+  } catch(e) {}
+
+  function bindSearch236() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (text === "rezepte suchen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return openSearch236();
+        };
+      }
+
+      if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return searchRecipes236();
+        };
+      }
+
+      if (text === "alle anzeigen" || onclick.includes("filterAnwenden")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          return showAll236();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    bindSearch236();
+    setTimeout(bindSearch236, 300);
+    setTimeout(bindSearch236, 1000);
+    setTimeout(bindSearch236, 2000);
+  });
+
+  window.rf236Diagnose = function() {
+    const list = parseRecipes();
+    return {
+      gespeicherteRezepte: list.length,
+      namen: list.map(r => r.name),
+      suchfeldName: value("suchNameInput"),
+      suchfeldZutaten: value("suchZutatenInput")
+    };
+  };
+})();
