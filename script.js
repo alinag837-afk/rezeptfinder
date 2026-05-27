@@ -28632,3 +28632,184 @@ window.addEventListener("load", function () {
     setTimeout(rf219BindBackupButton, 1500);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.20 Fix: Cloud-Backups einklappen geht wirklich zurück zur Übersicht
+// =====================================================
+
+(function () {
+  let rf220BackupsOpen = false;
+
+  function rf220Hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = "none";
+    el.classList.add("versteckt");
+  }
+
+  function rf220Show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+  }
+
+  function rf220FindBackupArea() {
+    const ids = [
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups",
+      "backupBereich"
+    ];
+
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) return el;
+    }
+
+    return Array.from(document.querySelectorAll("section, div")).find(el => {
+      const txt = (el.textContent || "").toLowerCase();
+      return txt.includes("cloud-backup") || txt.includes("backup wiederherstellen") || txt.includes("backup laden");
+    }) || null;
+  }
+
+  function rf220RealOverview() {
+    // Wenn es eine echte alte Übersichtsfunktion gibt, zuerst diese verwenden.
+    try {
+      if (typeof zurUebersicht === "function") {
+        zurUebersicht();
+      }
+    } catch(e) {}
+
+    // Danach sicher alles schließen, was nicht Übersicht ist.
+    [
+      "formularBereich",
+      "rezeptSucheBereich",
+      "sucheBereich",
+      "textImportBereich",
+      "einkaufBereich",
+      "datenpruefungBereich",
+      "backupBereich",
+      "cloudBackupListe",
+      "cloudBackupContainer",
+      "backupListe",
+      "backupContainer",
+      "cloudBackups"
+    ].forEach(id => rf220Hide(document.getElementById(id)));
+
+    const backupArea = rf220FindBackupArea();
+    rf220Hide(backupArea);
+
+    const ergebnisse = document.getElementById("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.innerHTML = "";
+      rf220Hide(ergebnisse);
+    }
+
+    // Dashboard/Startbereich wieder sichtbar lassen, falls vorhanden.
+    [
+      "dashboardBereich",
+      "startBereich",
+      "uebersichtBereich",
+      "aktionenBereich"
+    ].forEach(id => rf220Show(document.getElementById(id)));
+
+    document.body.classList.add("rf205-start", "rf196-startseite", "startseite-clean");
+
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch(e) {}
+  }
+
+  function rf220OpenBackups() {
+    document.body.classList.remove("rf205-start", "rf196-startseite", "startseite-clean");
+
+    // Originale Backup-Anzeige nutzen.
+    const originals = [
+      "cloudBackupsAnzeigen_original",
+      "cloudBackupAnzeigen_original",
+      "backupsAnzeigen_original",
+      "zeigeCloudBackups_original"
+    ];
+
+    for (const name of originals) {
+      try {
+        if (typeof window[name] === "function") {
+          window[name]();
+          rf220BackupsOpen = true;
+          return true;
+        }
+      } catch(e) {
+        console.error(e);
+      }
+    }
+
+    // Falls kein Original vorhanden ist, alte Funktion versuchen, aber nicht unseren Wrapper.
+    const names = ["cloudBackupsAnzeigen", "cloudBackupAnzeigen", "backupsAnzeigen", "zeigeCloudBackups"];
+    for (const name of names) {
+      try {
+        if (typeof window[name] === "function" && window[name] !== rf220ToggleBackups) {
+          window[name]();
+          rf220BackupsOpen = true;
+          return true;
+        }
+      } catch(e) {}
+    }
+
+    const area = rf220FindBackupArea();
+    rf220Show(area);
+    rf220BackupsOpen = true;
+    return true;
+  }
+
+  function rf220ToggleBackups() {
+    const area = rf220FindBackupArea();
+    const visible = area && !area.hidden && area.style.display !== "none" && !area.classList.contains("versteckt");
+
+    if (rf220BackupsOpen || visible) {
+      rf220BackupsOpen = false;
+      rf220RealOverview();
+      return false;
+    }
+
+    return rf220OpenBackups();
+  }
+
+  window.rf220ToggleBackups = rf220ToggleBackups;
+  window.rf218ToggleBackups = rf220ToggleBackups;
+  window.rf219ZurUebersichtNachBackup = rf220RealOverview;
+
+  // Alle Backup-Anzeigen auf Toggle legen.
+  ["cloudBackupsAnzeigen", "cloudBackupAnzeigen", "backupsAnzeigen", "zeigeCloudBackups"].forEach(name => {
+    if (typeof window[name] === "function" && !window[name + "_original"]) {
+      window[name + "_original"] = window[name];
+    }
+    window[name] = rf220ToggleBackups;
+  });
+
+  function rf220Bind() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+
+      if (text === "cloud-backups anzeigen" || text === "cloud backups anzeigen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf220ToggleBackups();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    rf220Bind();
+    setTimeout(rf220Bind, 300);
+    setTimeout(rf220Bind, 1000);
+    setTimeout(rf220Bind, 2000);
+  });
+})();
