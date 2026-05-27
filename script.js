@@ -27944,3 +27944,258 @@ window.addEventListener("load", function () {
     setTimeout(rf215BindCloudSaveButton, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.16 Fix: Cloud-Speicher-Loop stoppen
+// Upload nur bei manuellem Button oder genau einmal nach Rezept speichern.
+// Automatische Folgeaufrufe werden blockiert.
+// =====================================================
+
+(function () {
+  let rf216CloudBusy = false;
+  let rf216AllowedUntil = 0;
+  let rf216LastFinish = 0;
+  let rf216LastStart = 0;
+
+  function now216() {
+    return Date.now();
+  }
+
+  function rf216AllowCloud(ms) {
+    rf216AllowedUntil = now216() + ms;
+  }
+
+  function rf216IsAllowed() {
+    return now216() <= rf216AllowedUntil;
+  }
+
+  function rf216Status(text, error) {
+    try {
+      if (typeof cloudStatus === "function") cloudStatus(text, !!error);
+      else {
+        const el = document.getElementById("cloudStatus");
+        if (el) el.textContent = text;
+        console.log(text);
+      }
+    } catch(e) {
+      console.log(text);
+    }
+  }
+
+  function rf216LoadLocalRecipes() {
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch(e) {
+      list = [];
+    }
+
+    if (!Array.isArray(list)) list = [];
+
+    list = list
+      .filter(r => r && !r.geloescht && !r.deleted && !r.__deleted && r.id !== "__rezeptfinder_deleted_keys__")
+      .map(r => {
+        if (!r.id) {
+          try { r.id = crypto.randomUUID(); }
+          catch(e) { r.id = "rezept_" + Date.now() + "_" + Math.random().toString(16).slice(2); }
+        }
+        return r;
+      });
+
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    try { window.rezepte = list; rezepte = list; } catch(e) { window.rezepte = list; }
+    return list;
+  }
+
+  function rf216Client() {
+    try { if (typeof cloudInit === "function") cloudInit(); } catch(e) {}
+
+    const client = window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null);
+    if (!client) throw new Error("Supabase ist nicht verbunden.");
+    return client;
+  }
+
+  async function rf216Upload(source) {
+    const t = now216();
+
+    if (!rf216IsAllowed()) {
+      console.warn("Cloud-Upload blockiert:", source);
+      rf216Status("Automatischer Cloud-Upload blockiert.");
+      return false;
+    }
+
+    if (rf216CloudBusy) {
+      rf216Status("Cloud-Speichern läuft bereits ...");
+      return false;
+    }
+
+    if (t - rf216LastStart < 2500) {
+      console.warn("Cloud-Upload Doppellauf blockiert.");
+      rf216Status("Cloud-Speichern läuft bereits ...");
+      return false;
+    }
+
+    if (t - rf216LastFinish < 6000 && source === "auto") {
+      console.warn("Cloud-Loop blockiert.");
+      rf216Status("Automatischer Cloud-Upload blockiert.");
+      return false;
+    }
+
+    rf216CloudBusy = true;
+    rf216LastStart = t;
+
+    try {
+      const client = rf216Client();
+      const list = rf216LoadLocalRecipes();
+
+      rf216Status("speichere in Cloud ...");
+
+      const { data, error: selectError } = await client.from("rezepte").select("id");
+      if (selectError) throw selectError;
+
+      const ids = (data || [])
+        .map(row => row.id)
+        .filter(id => id && id !== "__rezeptfinder_deleted_keys__");
+
+      for (const id of ids) {
+        const { error: deleteError } = await client.from("rezepte").delete().eq("id", id);
+        if (deleteError) console.warn("Cloud-Zeile konnte nicht gelöscht werden:", id, deleteError);
+      }
+
+      const rows = list.map(r => ({
+        id: String(r.id),
+        name: r.name || "Unbenanntes Rezept",
+        daten: JSON.parse(JSON.stringify(r)),
+        aktualisiert_am: new Date().toISOString()
+      }));
+
+      if (rows.length) {
+        const { error: upsertError } = await client.from("rezepte").upsert(rows, { onConflict: "id" });
+        if (upsertError) throw upsertError;
+      }
+
+      rf216LastFinish = now216();
+
+      // Erlaubnis sofort verbrauchen. Dadurch kann kein Folge-Upload im Loop starten.
+      rf216AllowedUntil = 0;
+
+      rf216Status(rows.length + " Rezept(e) in Cloud gespeichert.");
+      if (typeof meldungAnzeigen === "function") meldungAnzeigen(rows.length + " Rezept(e) in Cloud gespeichert.");
+
+      return true;
+    } catch(e) {
+      console.error("Cloud-Speichern v2.16 Fehler:", e);
+      rf216Status("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      setTimeout(() => {
+        rf216CloudBusy = false;
+      }, 1500);
+    }
+  }
+
+  function rf216ManualUpload() {
+    rf216AllowCloud(3000);
+    return rf216Upload("manual");
+  }
+
+  function rf216AfterRecipeSaveUpload() {
+    rf216AllowCloud(3000);
+    return rf216Upload("recipe-save");
+  }
+
+  function rf216BlockedUpload() {
+    return rf216Upload("auto");
+  }
+
+  // Alte Cloud-Funktionen auf blockierten Weg legen.
+  // Nur der echte Button und Rezept-Speichern setzen vorher ein Erlaubnisfenster.
+  window.rf216ManualCloudUpload = rf216ManualUpload;
+  window.rf216AfterRecipeSaveUpload = rf216AfterRecipeSaveUpload;
+
+  window.cloudSpeichernAlle = rf216BlockedUpload;
+  window.cloudSpeichernAlleDirekt = rf216BlockedUpload;
+  window.cloudSpeichernAlleDirekt1294 = rf216BlockedUpload;
+  window.rf176CloudSaveReplace = rf216BlockedUpload;
+  window.rf215CloudSpeichern = rf216BlockedUpload;
+
+  try {
+    cloudSpeichernAlle = rf216BlockedUpload;
+    cloudSpeichernAlleDirekt = rf216BlockedUpload;
+    cloudSpeichernAlleDirekt1294 = rf216BlockedUpload;
+  } catch(e) {}
+
+  function rf216WrapSave(name) {
+    const oldFn = window[name] || (typeof globalThis !== "undefined" ? globalThis[name] : null);
+    if (typeof oldFn !== "function" || oldFn.__rf216Wrapped) return;
+
+    const wrapped = function() {
+      const result = oldFn.apply(this, arguments);
+
+      // Nach lokalem Speichern genau EIN Cloud-Upload.
+      setTimeout(() => {
+        rf216AfterRecipeSaveUpload();
+      }, 400);
+
+      return result;
+    };
+
+    wrapped.__rf216Wrapped = true;
+    window[name] = wrapped;
+    try { globalThis[name] = wrapped; } catch(e) {}
+  }
+
+  [
+    "rf214RezeptSpeichern",
+    "rf213RezeptSpeichern",
+    "rf212RezeptSpeichern",
+    "rezeptSpeichern",
+    "rezeptSpeichernDirektCloud",
+    "rf155RezeptSpeichern"
+  ].forEach(rf216WrapSave);
+
+  function rf216BindButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (
+        text === "jetzt in cloud speichern" ||
+        text.includes("cloud speichern") ||
+        onclick.includes("cloudSpeichernAlle")
+      ) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return rf216ManualUpload();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn) return;
+
+    const text = (btn.textContent || "").trim().toLowerCase();
+
+    if (text === "jetzt in cloud speichern" || text.includes("cloud speichern")) {
+      event.preventDefault();
+      event.stopPropagation();
+      return rf216ManualUpload();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    rf216BindButtons();
+    setTimeout(rf216BindButtons, 300);
+    setTimeout(rf216BindButtons, 1000);
+    setTimeout(rf216BindButtons, 2000);
+  });
+})();
