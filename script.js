@@ -33107,3 +33107,281 @@ window.addEventListener("load", function () {
     }));
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.44 Automatische Makro-Tags
+// Fügt automatisch hinzu:
+// protein-arm / protein-reich
+// kohlenhydrat-arm / kohlenhydrat-reich
+// fett-arm / fett-reich
+// Auch bei bereits gespeicherten Rezepten.
+// =====================================================
+
+(function () {
+  const AUTO_MACRO_TAGS_244 = new Set([
+    "protein-arm",
+    "protein-reich",
+    "kohlenhydrat-arm",
+    "kohlenhydrat-reich",
+    "fett-arm",
+    "fett-reich"
+  ]);
+
+  function $(id) { return document.getElementById(id); }
+
+  function normalizeTag244(tag) {
+    return String(tag || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/proteinarm/g, "protein-arm")
+      .replace(/proteinreich/g, "protein-reich")
+      .replace(/kohlenhydratarm/g, "kohlenhydrat-arm")
+      .replace(/kohlenhydratreich/g, "kohlenhydrat-reich")
+      .replace(/fettarm/g, "fett-arm")
+      .replace(/fettreich/g, "fett-reich");
+  }
+
+  function number244(value) {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).replace(",", ".").trim();
+    if (!raw) return null;
+    const match = raw.match(/-?\d+(?:\.\d+)?/);
+    if (!match) return null;
+    const n = Number(match[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function readNaehrwert244(rezept, keys, inputId) {
+    if (inputId) {
+      const input = $(inputId);
+      if (input) {
+        const fromInput = number244(input.value);
+        if (fromInput !== null) return fromInput;
+      }
+    }
+
+    const n = rezept && rezept.naehrwerte ? rezept.naehrwerte : {};
+    for (const key of keys) {
+      const val = number244(n[key]);
+      if (val !== null) return val;
+    }
+
+    // Fallback: manche alten Daten speichern Nährwerte direkt am Rezept
+    for (const key of keys) {
+      const val = number244(rezept ? rezept[key] : null);
+      if (val !== null) return val;
+    }
+
+    return null;
+  }
+
+  function macroTagsForValues244(protein, carbs, fat) {
+    const tags = [];
+
+    // Schwellen pro 100 g
+    if (protein !== null) {
+      if (protein < 5) tags.push("protein-arm");
+      if (protein >= 12) tags.push("protein-reich");
+    }
+
+    if (carbs !== null) {
+      if (carbs < 10) tags.push("kohlenhydrat-arm");
+      if (carbs >= 30) tags.push("kohlenhydrat-reich");
+    }
+
+    if (fat !== null) {
+      if (fat < 5) tags.push("fett-arm");
+      if (fat >= 20) tags.push("fett-reich");
+    }
+
+    return tags;
+  }
+
+  function macroTagsForRecipe244(rezept) {
+    const protein = readNaehrwert244(rezept, ["eiweiss", "eiweiß", "protein"], null);
+    const carbs = readNaehrwert244(rezept, ["kohlenhydrate", "carbs", "kh"], null);
+    const fat = readNaehrwert244(rezept, ["fett", "fat"], null);
+
+    return macroTagsForValues244(protein, carbs, fat);
+  }
+
+  function macroTagsFromForm244() {
+    const protein = number244($("eiweissInput") ? $("eiweissInput").value : "");
+    const carbs = number244($("kohlenhydrateInput") ? $("kohlenhydrateInput").value : "");
+    const fat = number244($("fettInput") ? $("fettInput").value : "");
+
+    return macroTagsForValues244(protein, carbs, fat);
+  }
+
+  function applyMacroTagsToTagInput244() {
+    const input = $("tagsInput");
+    if (!input) return;
+
+    const existing = String(input.value || "")
+      .split(",")
+      .map(normalizeTag244)
+      .filter(Boolean);
+
+    const manual = existing.filter(t => !AUTO_MACRO_TAGS_244.has(t));
+    const automatic = macroTagsFromForm244();
+
+    input.value = [...new Set([...manual, ...automatic])].join(", ");
+  }
+
+  function applyMacroTagsToRecipe244(rezept) {
+    if (!rezept || typeof rezept !== "object") return rezept;
+
+    const existing = Array.isArray(rezept.tags)
+      ? rezept.tags.map(normalizeTag244).filter(Boolean)
+      : String(rezept.tags || "").split(",").map(normalizeTag244).filter(Boolean);
+
+    const manual = existing.filter(t => !AUTO_MACRO_TAGS_244.has(t));
+    const automatic = macroTagsForRecipe244(rezept);
+
+    rezept.tags = [...new Set([...manual, ...automatic])];
+    return rezept;
+  }
+
+  function loadRecipes244() {
+    try {
+      const data = JSON.parse(localStorage.getItem("rezepte") || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveRecipes244(list) {
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    localStorage.setItem("rezepte_rf235_sicherung", JSON.stringify(list));
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+  }
+
+  function updateAllStoredRecipes244() {
+    const list = loadRecipes244();
+    if (!list.length) return 0;
+
+    let changed = 0;
+
+    list.forEach(rezept => {
+      const before = JSON.stringify(rezept.tags || []);
+      applyMacroTagsToRecipe244(rezept);
+      const after = JSON.stringify(rezept.tags || []);
+      if (before !== after) changed++;
+    });
+
+    saveRecipes244(list);
+
+    try {
+      if (typeof dashboardAktualisieren === "function") dashboardAktualisieren();
+    } catch(e) {}
+
+    return changed;
+  }
+
+  // Wichtig: direkt vor jedem Speichern Tags ins Formular setzen.
+  const oldSave244 =
+    window.rf241SaveWithNutritionTags ||
+    window.rf235Save ||
+    window.rezeptSpeichern ||
+    window.rf155RezeptSpeichern;
+
+  function saveWithMacroTags244() {
+    applyMacroTagsToTagInput244();
+
+    if (typeof oldSave244 === "function" && oldSave244 !== saveWithMacroTags244) {
+      const result = oldSave244.apply(this, arguments);
+
+      // Nach altem Speichern gespeicherte Rezepte ebenfalls korrigieren.
+      setTimeout(updateAllStoredRecipes244, 300);
+      setTimeout(updateAllStoredRecipes244, 1200);
+
+      return result;
+    }
+
+    alert("Speicherfunktion wurde nicht gefunden.");
+    return false;
+  }
+
+  window.rf244ApplyMacroTagsToAll = updateAllStoredRecipes244;
+  window.rf244ApplyMacroTagsToForm = applyMacroTagsToTagInput244;
+  window.rezeptSpeichern = saveWithMacroTags244;
+  window.rf155RezeptSpeichern = saveWithMacroTags244;
+  window.rezeptSpeichernDirektCloud = saveWithMacroTags244;
+
+  try {
+    rezeptSpeichern = saveWithMacroTags244;
+    rf155RezeptSpeichern = saveWithMacroTags244;
+    rezeptSpeichernDirektCloud = saveWithMacroTags244;
+  } catch(e) {}
+
+  function bind244() {
+    ["eiweissInput", "kohlenhydrateInput", "fettInput"].forEach(id => {
+      const el = $(id);
+      if (el && el.dataset.rf244Bound !== "1") {
+        el.dataset.rf244Bound = "1";
+        el.addEventListener("input", applyMacroTagsToTagInput244);
+        el.addEventListener("change", applyMacroTagsToTagInput244);
+      }
+    });
+
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+      const onclick = button.getAttribute("onclick") || "";
+
+      if (
+        text === "rezept speichern" ||
+        text === "speichern" ||
+        onclick.includes("rezeptSpeichern") ||
+        onclick.includes("rf155RezeptSpeichern")
+      ) {
+        button.type = "button";
+        button.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+          }
+          return saveWithMacroTags244();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+
+    const text = (button.textContent || "").trim().toLowerCase();
+
+    if (text === "rezept speichern" || text === "speichern") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      event.stopPropagation();
+      return saveWithMacroTags244();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    const changed = updateAllStoredRecipes244();
+    if (changed) console.log("v2.44 Makro-Tags ergänzt bei Rezepten:", changed);
+
+    bind244();
+    setTimeout(bind244, 300);
+    setTimeout(bind244, 1000);
+    setTimeout(updateAllStoredRecipes244, 1500);
+  });
+
+  window.rf244Diagnose = function() {
+    const list = loadRecipes244();
+    return {
+      rezepte: list.length,
+      beispielTags: list.slice(0, 5).map(r => ({ name: r.name, tags: r.tags, naehrwerte: r.naehrwerte })),
+      formularTags: $("tagsInput") ? $("tagsInput").value : ""
+    };
+  };
+})();
