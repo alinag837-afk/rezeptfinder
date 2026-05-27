@@ -30462,3 +30462,241 @@ window.addEventListener("load", function () {
     setTimeout(bind228, 2000);
   });
 })();
+
+
+
+// =====================================================
+// VERSION 2.29 Fix: Suche löscht keine neu gespeicherten Rezepte
+// Ursache: alte Such-/Cleanup-Funktionen überschreiben localStorage.
+// Suche arbeitet jetzt nur noch lesend.
+// =====================================================
+
+(function () {
+  function $(id) { return document.getElementById(id); }
+
+  function loadRecipesSafe() {
+    let list = [];
+    try {
+      list = JSON.parse(localStorage.getItem("rezepte") || "[]");
+    } catch(e) {
+      list = [];
+    }
+
+    if (!Array.isArray(list)) list = [];
+
+    // Nur Speicher synchronisieren, NICHT filtern/löschen.
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+
+    return list;
+  }
+
+  function normalize(value) {
+    return String(value || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+
+  function selectedCategories() {
+    const active = Array.from(document.querySelectorAll(".such-kategorie-kachel.aktiv, .kategorie-kachel.aktiv"));
+    const values = active
+      .map(el => el.dataset ? (el.dataset.kategorie || "") : "")
+      .filter(Boolean);
+
+    // Wenn keine Kategorie aktiv oder "Alle" aktiv: nicht filtern.
+    if (!values.length) return [];
+    return values;
+  }
+
+  function selectedTriedStatus() {
+    const ids = ["suchAusprobiertInput", "ausprobiertSucheInput", "suchStatusInput"];
+    for (const id of ids) {
+      const el = $(id);
+      if (el && el.value) return el.value;
+    }
+    return "";
+  }
+
+  function readSearchFields() {
+    return {
+      name: normalize($("suchNameInput")?.value || ""),
+      zutaten: normalize($("suchZutatenInput")?.value || ""),
+      tag: normalize($("suchTagInput")?.value || $("suchTagsInput")?.value || ""),
+      quelle: normalize($("suchQuelleInput")?.value || ""),
+      kategorien: selectedCategories(),
+      ausprobiert: selectedTriedStatus(),
+      sortierung: $("suchSortierungInput")?.value || "name"
+    };
+  }
+
+  function recipeIngredientsText(r) {
+    const parts = [];
+
+    if (Array.isArray(r.zutaten)) {
+      r.zutaten.forEach(z => {
+        if (typeof z === "string") parts.push(z);
+        else if (z) parts.push([z.menge, z.einheit, z.name || z.zutat].filter(Boolean).join(" "));
+      });
+    }
+
+    if (Array.isArray(r.zutatenGruppen)) {
+      r.zutatenGruppen.forEach(g => {
+        (g.zutaten || []).forEach(z => {
+          if (typeof z === "string") parts.push(z);
+          else if (z) parts.push([z.menge, z.einheit, z.name || z.zutat].filter(Boolean).join(" "));
+        });
+      });
+    }
+
+    return normalize(parts.join(" "));
+  }
+
+  function recipeTagsText(r) {
+    if (Array.isArray(r.tags)) return normalize(r.tags.join(" "));
+    return normalize(r.tags || "");
+  }
+
+  function matchesTried(r, value) {
+    if (!value) return true;
+    const v = String(value).toLowerCase();
+
+    if (v === "alle") return true;
+    if (v === "true" || v.includes("schon")) return !!r.ausprobiert;
+    if (v === "false" || v.includes("nicht")) return !r.ausprobiert;
+
+    return true;
+  }
+
+  function sortResults(list, sortierung) {
+    const copy = [...list];
+
+    if (sortierung === "name") {
+      copy.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "de"));
+    } else if (sortierung === "kategorie") {
+      copy.sort((a, b) => String(a.kategorie || "").localeCompare(String(b.kategorie || ""), "de"));
+    } else if (sortierung === "quelle") {
+      copy.sort((a, b) => String(a.quelle || "").localeCompare(String(b.quelle || ""), "de"));
+    }
+
+    return copy;
+  }
+
+  function safeSearch() {
+    const list = loadRecipesSafe();
+    const f = readSearchFields();
+
+    let results = list.map((r, index) => ({
+      ...r,
+      index,
+      vorhandene: [],
+      fehlende: []
+    }));
+
+    results = results.filter(r => {
+      const nameOk = !f.name || normalize(r.name).includes(f.name);
+      const zutatenOk = !f.zutaten || recipeIngredientsText(r).includes(f.zutaten);
+      const tagOk = !f.tag || recipeTagsText(r).includes(f.tag);
+      const quelleOk = !f.quelle || normalize(r.quelle).includes(f.quelle);
+      const katOk = !f.kategorien.length || f.kategorien.includes(r.kategorie || "Nicht zugeordnet");
+      const triedOk = matchesTried(r, f.ausprobiert);
+
+      return nameOk && zutatenOk && tagOk && quelleOk && katOk && triedOk;
+    });
+
+    results = sortResults(results, f.sortierung);
+
+    const ergebnisse = $("ergebnisse");
+    if (ergebnisse) {
+      ergebnisse.hidden = false;
+      ergebnisse.style.display = "";
+      ergebnisse.classList.remove("versteckt");
+    }
+
+    if (typeof zeigeErgebnisse === "function") {
+      zeigeErgebnisse(results);
+    } else if (ergebnisse) {
+      ergebnisse.innerHTML = results.map(r => `<div class="rezept"><h3>${r.name || "Unbenanntes Rezept"}</h3></div>`).join("");
+    }
+
+    const treffer = $("suchTrefferAnzeige");
+    if (treffer) treffer.textContent = results.length + " Treffer";
+
+    // Wichtig: localStorage wird hier bewusst NICHT gespeichert.
+    return false;
+  }
+
+  function openSearch() {
+    document.body.classList.remove("rf205-start", "rf196-startseite", "startseite-clean");
+
+    ["formularBereich", "textImportBereich", "einkaufBereich", "datenpruefungBereich"].forEach(id => {
+      const el = $(id);
+      if (el) {
+        el.hidden = true;
+        el.style.display = "none";
+        el.classList.add("versteckt");
+      }
+    });
+
+    const search = $("rezeptSucheBereich") || $("sucheBereich");
+    if (search) {
+      search.hidden = false;
+      search.style.display = "";
+      search.classList.remove("versteckt");
+      try { search.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    }
+
+    loadRecipesSafe();
+    return false;
+  }
+
+  // Gefährliche alte Cleanup-Funktionen bei Suche neutralisieren, falls sie existieren.
+  window.rezeptSucheAusfuehren = safeSearch;
+  window.filterAnwenden = safeSearch;
+  window.rf229SafeSearch = safeSearch;
+
+  function bindSearchButtons() {
+    document.querySelectorAll("button").forEach(btn => {
+      const text = (btn.textContent || "").trim().toLowerCase();
+      const onclick = btn.getAttribute("onclick") || "";
+
+      if (text === "rezepte suchen") {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return openSearch();
+        };
+      }
+
+      if (text === "suchen" || onclick.includes("rezeptSucheAusfuehren") || onclick.includes("filterAnwenden")) {
+        btn.type = "button";
+        btn.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return safeSearch();
+        };
+      }
+    });
+
+    // Live-Filter/Enter optional absichern
+    ["suchNameInput", "suchZutatenInput", "suchTagInput", "suchTagsInput", "suchQuelleInput", "suchSortierungInput"].forEach(id => {
+      const el = $(id);
+      if (el && !el.dataset.rf229Bound) {
+        el.dataset.rf229Bound = "1";
+        el.addEventListener("change", safeSearch);
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    bindSearchButtons();
+    setTimeout(bindSearchButtons, 300);
+    setTimeout(bindSearchButtons, 1000);
+    setTimeout(bindSearchButtons, 2000);
+  });
+})();
