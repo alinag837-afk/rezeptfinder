@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.9";
+const APP_VERSION = "3.10";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://pkobmwkljznvhmlrnfqb.supabase.co";
@@ -2263,4 +2263,142 @@ window.rf39Diagnose = function() {
     keyVorhanden: !!SUPABASE_KEY && !String(SUPABASE_KEY).includes("PASTE_"),
     status: document.getElementById("cloudStatusText") ? document.getElementById("cloudStatusText").textContent : null
   };
+};
+
+
+// =====================================================
+// v3.10 Startseiten-Buttons dauerhaft stabil binden
+// =====================================================
+
+function safeCallV310(fn, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (typeof fn === "function") {
+    return fn();
+  }
+
+  alert("Diese Funktion wurde nicht gefunden.");
+  return false;
+}
+
+function bindMainActionButtonsV310() {
+  const bindings = {
+    rf207CloudSpeichern: () => cloudSpeichernAlle(),
+    rf207CloudLaden: () => cloudLaden(),
+    rf207CloudBackups: () => cloudBackupsAnzeigen(),
+    rf207BackupDownload: () => backupErstellen(),
+    rf207RezepteSuchen: () => rezeptSucheToggle(),
+    rf207RezeptHinzufuegen: () => neuesRezeptOeffnen(),
+    rf207AlleRezepte: () => alleRezepteAnzeigen(),
+    rf207Einkaufsliste: () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      bereichAnzeigen("einkaufBereich");
+      einkaufslisteErstellen();
+      return false;
+    },
+    rf207RezeptAssistent: () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      return textImportToggle();
+    },
+    rf207RezeptePruefen: () => datenpruefungToggle()
+  };
+
+  Object.entries(bindings).forEach(([id, fn]) => {
+    const button = document.getElementById(id);
+    if (!button) return;
+
+    button.type = "button";
+    button.removeAttribute("onclick");
+    button.onclick = function(event) {
+      return safeCallV310(fn, event);
+    };
+  });
+
+  const saveButton = document.getElementById("saveRecipeButton");
+  if (saveButton) {
+    saveButton.type = "button";
+    saveButton.removeAttribute("onclick");
+    saveButton.onclick = function(event) {
+      return safeCallV310(() => rezeptSpeichern(), event);
+    };
+  }
+
+  const analyzeButton = document.getElementById("rezeptAnalysierenButton");
+  if (analyzeButton) {
+    analyzeButton.type = "button";
+    analyzeButton.removeAttribute("onclick");
+    analyzeButton.onclick = function(event) {
+      return safeCallV310(() => rezeptAnalysierenDirekt(), event);
+    };
+  }
+}
+
+window.bindMainActionButtonsV310 = bindMainActionButtonsV310;
+
+document.addEventListener("click", function(event) {
+  const button = event.target && event.target.closest ? event.target.closest("button") : null;
+  if (!button) return;
+
+  const id = button.id;
+
+  const map = {
+    rf207CloudSpeichern: () => cloudSpeichernAlle(),
+    rf207CloudLaden: () => cloudLaden(),
+    rf207CloudBackups: () => cloudBackupsAnzeigen(),
+    rf207BackupDownload: () => backupErstellen(),
+    rf207RezepteSuchen: () => rezeptSucheToggle(),
+    rf207RezeptHinzufuegen: () => neuesRezeptOeffnen(),
+    rf207AlleRezepte: () => alleRezepteAnzeigen(),
+    rf207Einkaufsliste: () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      bereichAnzeigen("einkaufBereich");
+      einkaufslisteErstellen();
+      return false;
+    },
+    rf207RezeptAssistent: () => {
+      if (typeof clearResultsV34 === "function") clearResultsV34();
+      return textImportToggle();
+    },
+    rf207RezeptePruefen: () => datenpruefungToggle()
+  };
+
+  if (map[id]) {
+    return safeCallV310(map[id], event);
+  }
+}, true);
+
+window.addEventListener("load", function() {
+  bindMainActionButtonsV310();
+  setTimeout(bindMainActionButtonsV310, 100);
+  setTimeout(bindMainActionButtonsV310, 500);
+  setTimeout(bindMainActionButtonsV310, 1500);
+  setTimeout(bindMainActionButtonsV310, 3000);
+});
+
+window.rf310Diagnose = function() {
+  const ids = [
+    "rf207CloudSpeichern",
+    "rf207CloudLaden",
+    "rf207CloudBackups",
+    "rf207BackupDownload",
+    "rf207RezepteSuchen",
+    "rf207RezeptHinzufuegen",
+    "rf207AlleRezepte",
+    "rf207Einkaufsliste",
+    "rf207RezeptAssistent",
+    "rf207RezeptePruefen"
+  ];
+
+  return ids.map(id => {
+    const btn = document.getElementById(id);
+    return {
+      id,
+      vorhanden: !!btn,
+      hatOnclick: !!(btn && btn.onclick),
+      text: btn ? btn.textContent.trim() : ""
+    };
+  });
 };
