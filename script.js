@@ -11,7 +11,7 @@
   - keine alten rf2xx-Patches
 */
 
-const APP_VERSION = "3.5";
+const APP_VERSION = "3.6";
 const STORAGE_KEY = "rezepte";
 const BACKUP_KEY = "rezepte_backup_v3";
 const SUPABASE_URL = "https://oxsuwvbfzijbzffkaqeg.supabase.co";
@@ -1835,5 +1835,63 @@ window.rf35Diagnose = function() {
   return {
     cloudKeyVorhanden: cloudKeyVorhandenV35(),
     cloudStatus: document.getElementById("cloudStatus") ? document.getElementById("cloudStatus").textContent : null
+  };
+};
+
+
+// =====================================================
+// v3.6 Cloud-Status richtig leeren/anzeigen
+// Fix: HTML verwendet cloudStatusText, nicht cloudStatus.
+// =====================================================
+
+function cloudStatusElementV36() {
+  return document.getElementById("cloudStatusText") || document.getElementById("cloudStatus");
+}
+
+function cloudStatusV36(text, error = false) {
+  const el = cloudStatusElementV36();
+  if (el) {
+    el.textContent = text || "";
+    el.style.color = error ? "crimson" : "";
+  }
+}
+
+function clearCloudStartTextV36() {
+  const el = cloudStatusElementV36();
+  if (!el) return;
+
+  const text = (el.textContent || "").toLowerCase();
+
+  if (
+    !text ||
+    text.includes("wird verbunden") ||
+    text.includes("cloud wird verbunden") ||
+    text.includes("verbunden ...")
+  ) {
+    el.textContent = "";
+    el.style.color = "";
+  }
+}
+
+// vorhandene cloudStatus-Funktion überschreiben,
+// damit alle alten Funktionen auch das richtige HTML-Element nutzen.
+window.cloudStatus = cloudStatusV36;
+
+try {
+  cloudStatus = cloudStatusV36;
+} catch(e) {}
+
+window.addEventListener("load", function() {
+  clearCloudStartTextV36();
+  setTimeout(clearCloudStartTextV36, 50);
+  setTimeout(clearCloudStartTextV36, 250);
+  setTimeout(clearCloudStartTextV36, 1000);
+});
+
+window.rf36Diagnose = function() {
+  const el = cloudStatusElementV36();
+  return {
+    cloudStatusText: el ? el.textContent : null,
+    cloudStatusElementGefunden: !!el
   };
 };
