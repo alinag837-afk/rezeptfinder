@@ -33575,3 +33575,202 @@ window.addEventListener("load", function () {
   });
 
 })();
+
+
+
+// =====================================================
+// VERSION 2.47 Kategorie-Filter Fix
+// =====================================================
+
+(function () {
+
+  function rf247Norm(v) {
+    return String(v || "")
+      .trim()
+      .toLocaleLowerCase("de");
+  }
+
+  function rf247GetSelectedCategories() {
+
+    const active = [];
+
+    document.querySelectorAll(
+      "#suchKategorieKacheln .aktiv, #suchKategorieKacheln .kategorie-kachel.aktiv, #suchKategorieKacheln .such-kategorie-kachel.aktiv"
+    ).forEach(el => {
+
+      const value =
+        el.dataset?.kategorie ||
+        el.getAttribute("data-kategorie") ||
+        el.textContent ||
+        "";
+
+      const normalized = rf247Norm(value);
+
+      if (
+        normalized &&
+        normalized !== "alle" &&
+        normalized !== "alle rezepte" &&
+        normalized !== "alle anzeigen"
+      ) {
+        active.push(normalized);
+      }
+
+    });
+
+    return [...new Set(active)];
+  }
+
+  function rf247ApplyCategoryFilter(results) {
+
+    const selected = rf247GetSelectedCategories();
+
+    if (!selected.length) {
+      return results;
+    }
+
+    return results.filter(recipe => {
+
+      const category = rf247Norm(
+        recipe?.kategorie ||
+        recipe?.category ||
+        ""
+      );
+
+      return selected.includes(category);
+
+    });
+
+  }
+
+  const oldSearch247 =
+    window.rf237Search ||
+    window.rezeptSucheAusfuehren;
+
+  function search247() {
+
+    if (typeof oldSearch247 === "function") {
+      oldSearch247.apply(this, arguments);
+    }
+
+    let results = [];
+
+    try {
+      if (Array.isArray(window.letzteSuchErgebnisse)) {
+        results = [...window.letzteSuchErgebnisse];
+      }
+    } catch(e) {}
+
+    if (!results.length) {
+
+      try {
+
+        const data = JSON.parse(
+          localStorage.getItem("rezepte") || "[]"
+        );
+
+        if (Array.isArray(data)) {
+          results = data.map((r, index) => ({
+            ...r,
+            index
+          }));
+        }
+
+      } catch(e) {}
+
+    }
+
+    const filtered = rf247ApplyCategoryFilter(results);
+
+    window.letzteSuchErgebnisse = filtered;
+
+    try {
+      letzteSuchErgebnisse = filtered;
+    } catch(e) {}
+
+    try {
+
+      if (typeof zeigeErgebnisse === "function") {
+        zeigeErgebnisse(filtered);
+      }
+
+    } catch(e) {}
+
+    const counter =
+      document.getElementById("suchTrefferAnzeige");
+
+    if (counter) {
+      counter.textContent = filtered.length + " Treffer";
+    }
+
+    return filtered;
+  }
+
+  window.rezeptSucheAusfuehren = search247;
+  window.rf247Search = search247;
+
+  try {
+    rezeptSucheAusfuehren = search247;
+  } catch(e) {}
+
+  function bind247() {
+
+    document.querySelectorAll(
+      "#suchKategorieKacheln .kategorie-kachel, #suchKategorieKacheln .such-kategorie-kachel"
+    ).forEach(kachel => {
+
+      if (kachel.dataset.rf247Bound === "1") return;
+
+      kachel.dataset.rf247Bound = "1";
+
+      kachel.addEventListener("click", function() {
+
+        setTimeout(() => {
+          search247();
+        }, 60);
+
+      });
+
+    });
+
+    document.querySelectorAll("button").forEach(button => {
+
+      const text = (button.textContent || "")
+        .trim()
+        .toLowerCase();
+
+      const onclick =
+        button.getAttribute("onclick") || "";
+
+      if (
+        text === "suchen" ||
+        onclick.includes("rezeptSucheAusfuehren")
+      ) {
+
+        button.type = "button";
+
+        button.onclick = function(event) {
+
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+
+          return search247();
+        };
+      }
+
+    });
+
+  }
+
+  window.addEventListener("load", function() {
+
+    bind247();
+
+    setTimeout(bind247, 300);
+    setTimeout(bind247, 1000);
+    setTimeout(bind247, 2000);
+
+  });
+
+})();
