@@ -1170,29 +1170,3 @@ body.rf205-start #rf205BackupPanel {
 .rf243-zutat-loeschen {
   margin-left: 8px;
 }
-
-
-/* v3.0 clean additions */
-.zutatengruppe {
-  border: 1px solid #dbe3ef;
-  border-radius: 14px;
-  padding: 12px;
-  margin: 12px 0;
-  background: #fff;
-}
-
-.zutaten-zeile {
-  display: grid;
-  grid-template-columns: minmax(70px, 0.7fr) minmax(90px, 0.8fr) minmax(160px, 2fr) auto;
-  gap: 8px;
-  align-items: center;
-  margin: 8px 0;
-}
-
-.zutat-original-loeschen {
-  min-width: 42px;
-}
-
-.rezeptkarte, .rezept-detail {
-  margin: 14px 0;
-}

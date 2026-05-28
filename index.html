@@ -8,8 +8,8 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v3.19 Cloud</title>
-  <link rel="stylesheet" href="style.css?v=3190">
+  <title>Rezeptfinder v3.20 Stable Cloud</title>
+  <link rel="stylesheet" href="style.css?v=3200">
 </head>
 <body>
 <main class="container">
@@ -27,9 +27,9 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v3.19 Cloud</p>
+    <p class="version">Rezeptfinder v3.20 Stable Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
-      <strong>Cloud:</strong> <span id="cloudStatusText">Nicht verbunden</span>
+      <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
 <div class="button-gruppe">
     <button id="rf207CloudSpeichern" type="button">Jetzt in Cloud speichern</button>
@@ -175,7 +175,7 @@
       </div>
 
         <h3>Zusatzinfos</h3><textarea id="notizenInput" placeholder="Notizen"></textarea><textarea id="tagsInput" list="tagsListe" placeholder="Tags, mit Komma getrennt"></textarea></div>
-    <button id="saveRecipeButton" type="button">Rezept speichern</button>
+    <button id="rf235SaveButton" type="button">Rezept speichern</button>
     <button onclick="formularLeeren()">Formular leeren</button>
   </section>
 
@@ -277,10 +277,10 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
 <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v3.19 Cloud</footer>
+  <footer>Rezeptfinder v3.20 Stable Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=3190"></script>
+  <script src="script.js?v=3200"></script>
 
 <select id="bewertungFilter" class="versteckt"><option value=""></option></select>
 <div id="schnellfilterInhalt" class="versteckt"></div>
