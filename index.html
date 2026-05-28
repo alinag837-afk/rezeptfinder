@@ -8,8 +8,8 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v3.20 Stable Cloud</title>
-  <link rel="stylesheet" href="style.css?v=3200">
+  <title>Rezeptfinder v3.21 Stable Cloud</title>
+  <link rel="stylesheet" href="style.css?v=3210">
 </head>
 <body>
 <main class="container">
@@ -27,7 +27,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v3.20 Stable Cloud</p>
+    <p class="version">Rezeptfinder v3.21 Stable Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -52,7 +52,7 @@
     <button id="rf207RezeptHinzufuegen" type="button">Rezept hinzufügen</button>
 <button id="rf207AlleRezepte" type="button">Alle Rezepte anzeigen</button>
     <button id="rf207Einkaufsliste" type="button">Einkaufsliste</button>
-    <button id="rf207RezeptAssistent" type="button">Rezept-Assistent</button>
+    <button id="rf207RezeptAssistent" type="button" onclick="return forceOpenAssistant321(event)">Rezept-Assistent</button>
     <button id="rf207RezeptePruefen" type="button">Rezepte prüfen</button>
 </section>
 
@@ -277,10 +277,10 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
 <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v3.20 Stable Cloud</footer>
+  <footer>Rezeptfinder v3.21 Stable Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=3200"></script>
+  <script src="script.js?v=3210"></script>
 
 <select id="bewertungFilter" class="versteckt"><option value=""></option></select>
 <div id="schnellfilterInhalt" class="versteckt"></div>

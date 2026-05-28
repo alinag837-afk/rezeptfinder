@@ -33790,3 +33790,139 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+// =====================================================
+// VERSION 3.21 STABLE
+// Fix: Rezept-Assistent Button öffnet textImportBereich direkt.
+// =====================================================
+
+(function () {
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+  function hide(id) {
+    const el = byId(id);
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = "none";
+    el.classList.add("versteckt");
+  }
+
+  function show(id) {
+    const el = byId(id);
+    if (!el) return false;
+    el.hidden = false;
+    el.style.display = "";
+    el.classList.remove("versteckt");
+    try { el.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e) {}
+    return false;
+  }
+
+  function clearOutput() {
+    const out = byId("ergebnisse");
+    if (out) {
+      out.innerHTML = "";
+      out.hidden = true;
+      out.style.display = "none";
+      out.classList.add("versteckt");
+    }
+  }
+
+  function resetAssistantPreviewOnly() {
+    const preview = byId("assistentVorschau");
+    const status = byId("assistentStatus");
+
+    if (preview) {
+      preview.innerHTML = "";
+      preview.hidden = true;
+      preview.style.display = "none";
+      preview.classList.add("versteckt");
+    }
+
+    if (status) status.textContent = "";
+
+    window.assistentDaten = null;
+  }
+
+  function forceOpenAssistant321(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    clearOutput();
+    resetAssistantPreviewOnly();
+
+    [
+      "sucheBereich",
+      "rezeptSucheBereich",
+      "formularBereich",
+      "einkaufBereich",
+      "backupBereich",
+      "datenpruefungBereich"
+    ].forEach(hide);
+
+    return show("textImportBereich");
+  }
+
+  window.forceOpenAssistant321 = forceOpenAssistant321;
+  window.textImportToggle = forceOpenAssistant321;
+  window.rezeptAssistentToggle = forceOpenAssistant321;
+
+  try {
+    textImportToggle = forceOpenAssistant321;
+    rezeptAssistentToggle = forceOpenAssistant321;
+  } catch(e) {}
+
+  function bindAssistant321() {
+    const btn = byId("rf207RezeptAssistent");
+    if (!btn) return;
+
+    btn.type = "button";
+    btn.onclick = forceOpenAssistant321;
+  }
+
+  // Früher Capture-Handler: nur diesen Button direkt abfangen.
+  document.addEventListener("click", function(event) {
+    const btn = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!btn || btn.id !== "rf207RezeptAssistent") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+
+    return forceOpenAssistant321(event);
+  }, true);
+
+  // Nach Speichern erneut binden.
+  const oldSave321 = window.rezeptSpeichern;
+  if (typeof oldSave321 === "function") {
+    window.rezeptSpeichern = function() {
+      const result = oldSave321.apply(this, arguments);
+      setTimeout(bindAssistant321, 100);
+      setTimeout(bindAssistant321, 500);
+      return result;
+    };
+    try { rezeptSpeichern = window.rezeptSpeichern; } catch(e) {}
+  }
+
+  window.addEventListener("load", function() {
+    bindAssistant321();
+    setTimeout(bindAssistant321, 100);
+    setTimeout(bindAssistant321, 500);
+    setTimeout(bindAssistant321, 1500);
+  });
+
+  window.rf321Diagnose = function() {
+    const btn = byId("rf207RezeptAssistent");
+    const area = byId("textImportBereich");
+    return {
+      assistantButtonVorhanden: !!btn,
+      assistantButtonHatOnclick: !!(btn && btn.onclick),
+      assistantBereichVorhanden: !!area,
+      assistantBereichSichtbar: !!(area && !area.hidden && area.style.display !== "none")
+    };
+  };
+})();
