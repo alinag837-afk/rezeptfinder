@@ -33774,3 +33774,405 @@ window.addEventListener("load", function () {
   });
 
 })();
+
+
+
+// =====================================================
+// VERSION 2.48 Automatische Tags für KH, Protein und Fett
+// Tags:
+// kh-arm / kh-reich
+// protein-arm / protein-reich
+// fett-arm / fett-reich
+// Wird beim Speichern und rückwirkend auf gespeicherte Rezepte angewendet.
+// =====================================================
+
+(function () {
+  const AUTO_TAGS_248 = new Set([
+    "kh-arm", "kh-reich",
+    "kohlenhydrat-arm", "kohlenhydrat-reich",
+    "protein-arm", "protein-reich",
+    "fett-arm", "fett-reich"
+  ]);
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function normalizeTag248(tag) {
+    return String(tag || "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/proteinarm/g, "protein-arm")
+      .replace(/proteinreich/g, "protein-reich")
+      .replace(/kohlenhydratarm/g, "kh-arm")
+      .replace(/kohlenhydratreich/g, "kh-reich")
+      .replace(/kohlenhydrate-arm/g, "kh-arm")
+      .replace(/kohlenhydrate-reich/g, "kh-reich")
+      .replace(/kharm/g, "kh-arm")
+      .replace(/khreich/g, "kh-reich")
+      .replace(/fettarm/g, "fett-arm")
+      .replace(/fettreich/g, "fett-reich");
+  }
+
+  function number248(value) {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).replace(",", ".").trim();
+    if (!raw) return null;
+    const m = raw.match(/-?\d+(?:\.\d+)?/);
+    if (!m) return null;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function readFormNumber248(id) {
+    const el = $(id);
+    return el ? number248(el.value) : null;
+  }
+
+  function readRecipeNumber248(recipe, keys) {
+    const n = recipe && recipe.naehrwerte ? recipe.naehrwerte : {};
+
+    for (const key of keys) {
+      const val = number248(n[key]);
+      if (val !== null) return val;
+    }
+
+    for (const key of keys) {
+      const val = number248(recipe ? recipe[key] : null);
+      if (val !== null) return val;
+    }
+
+    return null;
+  }
+
+  function macroTags248(protein, carbs, fat) {
+    const tags = [];
+
+    // Werte gelten pro 100 g
+    if (protein !== null) {
+      if (protein < 5) tags.push("protein-arm");
+      if (protein >= 12) tags.push("protein-reich");
+    }
+
+    if (carbs !== null) {
+      if (carbs < 10) tags.push("kh-arm");
+      if (carbs >= 30) tags.push("kh-reich");
+    }
+
+    if (fat !== null) {
+      if (fat < 5) tags.push("fett-arm");
+      if (fat >= 20) tags.push("fett-reich");
+    }
+
+    return tags;
+  }
+
+  function macroTagsFromForm248() {
+    const protein = readFormNumber248("eiweissInput");
+    const carbs = readFormNumber248("kohlenhydrateInput");
+    const fat = readFormNumber248("fettInput");
+
+    return macroTags248(protein, carbs, fat);
+  }
+
+  function macroTagsFromRecipe248(recipe) {
+    const protein = readRecipeNumber248(recipe, ["eiweiss", "eiweiß", "protein"]);
+    const carbs = readRecipeNumber248(recipe, ["kohlenhydrate", "kh", "carbs"]);
+    const fat = readRecipeNumber248(recipe, ["fett", "fat"]);
+
+    return macroTags248(protein, carbs, fat);
+  }
+
+  function updateTagInput248() {
+    const input = $("tagsInput");
+    if (!input) return;
+
+    const existing = String(input.value || "")
+      .split(",")
+      .map(normalizeTag248)
+      .filter(Boolean);
+
+    const manual = existing.filter(t => !AUTO_TAGS_248.has(t));
+    const automatic = macroTagsFromForm248();
+
+    input.value = [...new Set([...manual, ...automatic])].join(", ");
+  }
+
+  function updateRecipeTags248(recipe) {
+    if (!recipe || typeof recipe !== "object") return recipe;
+
+    const existing = Array.isArray(recipe.tags)
+      ? recipe.tags.map(normalizeTag248).filter(Boolean)
+      : String(recipe.tags || "").split(",").map(normalizeTag248).filter(Boolean);
+
+    const manual = existing.filter(t => !AUTO_TAGS_248.has(t));
+    const automatic = macroTagsFromRecipe248(recipe);
+
+    recipe.tags = [...new Set([...manual, ...automatic])];
+    return recipe;
+  }
+
+  function loadRecipes248() {
+    try {
+      const data = JSON.parse(localStorage.getItem("rezepte") || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function saveRecipes248(list) {
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    localStorage.setItem("rezepte_rf235_sicherung", JSON.stringify(list));
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+  }
+
+  function updateAllStoredRecipes248() {
+    const list = loadRecipes248();
+    let changed = 0;
+
+    list.forEach(recipe => {
+      const before = JSON.stringify(recipe.tags || []);
+      updateRecipeTags248(recipe);
+      const after = JSON.stringify(recipe.tags || []);
+      if (before !== after) changed++;
+    });
+
+    if (changed) {
+      saveRecipes248(list);
+      try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+    }
+
+    return changed;
+  }
+
+  const oldSave248 =
+    window.rf244ApplyMacroTagsToForm ||
+    window.rf241SaveWithNutritionTags ||
+    window.rf235Save ||
+    window.rezeptSpeichern ||
+    window.rf155RezeptSpeichern;
+
+  function saveWithAutoTags248() {
+    updateTagInput248();
+
+    // Falls rf244ApplyMacroTagsToForm nur Formular-Tags setzt, nicht als Speicherfunktion verwenden.
+    let realSave =
+      window.rf235Save ||
+      window.rezeptSpeichern ||
+      window.rf155RezeptSpeichern;
+
+    if (realSave === saveWithAutoTags248) {
+      realSave = null;
+    }
+
+    const result = typeof realSave === "function"
+      ? realSave.apply(this, arguments)
+      : false;
+
+    setTimeout(updateAllStoredRecipes248, 250);
+    setTimeout(updateAllStoredRecipes248, 1000);
+
+    return result;
+  }
+
+  window.rf248UpdateTagInput = updateTagInput248;
+  window.rf248UpdateAllStoredRecipes = updateAllStoredRecipes248;
+  window.rezeptSpeichern = saveWithAutoTags248;
+  window.rf155RezeptSpeichern = saveWithAutoTags248;
+  window.rezeptSpeichernDirektCloud = saveWithAutoTags248;
+
+  try {
+    rezeptSpeichern = saveWithAutoTags248;
+    rf155RezeptSpeichern = saveWithAutoTags248;
+    rezeptSpeichernDirektCloud = saveWithAutoTags248;
+  } catch(e) {}
+
+  function bind248() {
+    ["eiweissInput", "kohlenhydrateInput", "fettInput"].forEach(id => {
+      const el = $(id);
+      if (el && el.dataset.rf248Bound !== "1") {
+        el.dataset.rf248Bound = "1";
+        el.addEventListener("input", updateTagInput248);
+        el.addEventListener("change", updateTagInput248);
+      }
+    });
+
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+
+      if (text === "rezept speichern" || text === "speichern") {
+        const oldClick = button.onclick;
+        button.type = "button";
+        button.onclick = function(event) {
+          updateTagInput248();
+
+          if (oldClick && oldClick !== button.onclick) {
+            const result = oldClick.call(this, event);
+            setTimeout(updateAllStoredRecipes248, 300);
+            return result;
+          }
+
+          return saveWithAutoTags248();
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    const changed = updateAllStoredRecipes248();
+    if (changed) console.log("v2.48 automatische KH/Protein/Fett-Tags ergänzt:", changed);
+
+    bind248();
+    setTimeout(bind248, 300);
+    setTimeout(bind248, 1000);
+    setTimeout(updateAllStoredRecipes248, 1500);
+  });
+
+  window.rf248Diagnose = function() {
+    const list = loadRecipes248();
+    return {
+      rezepte: list.length,
+      formularTags: $("tagsInput") ? $("tagsInput").value : "",
+      beispiele: list.slice(0, 8).map(r => ({
+        name: r.name,
+        tags: r.tags,
+        naehrwerte: r.naehrwerte
+      }))
+    };
+  };
+})();
+
+
+
+// =====================================================
+// VERSION 2.49 Suche nach Bearbeiten stabil anzeigen
+// =====================================================
+(function(){
+  function $(id){return document.getElementById(id);}
+  function esc(v){return String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function norm(v){return String(v||"").toLowerCase().trim();}
+  function value(id){
+    const el=$(id); if(!el) return "";
+    if(el.tagName&&el.tagName.toLowerCase()==="select"&&el.multiple){
+      return Array.from(el.selectedOptions||[]).map(o=>o.value||o.textContent||"").join(" ");
+    }
+    return String(el.value||"").trim();
+  }
+  function loadRecipes249(){
+    let list=[];
+    try{list=JSON.parse(localStorage.getItem("rezepte")||"[]");}catch(e){list=[];}
+    if(!Array.isArray(list)) list=[];
+    list=list.filter(r=>r&&!r.geloescht&&!r.deleted&&!r.__deleted&&r.id!=="__rezeptfinder_deleted_keys__");
+    window.rezepte=list; try{rezepte=list;}catch(e){}
+    return list;
+  }
+  function ingredientsText249(r){
+    const parts=[];
+    if(Array.isArray(r.zutaten)){
+      r.zutaten.forEach(z=>{if(typeof z==="string") parts.push(z); else if(z) parts.push([z.menge,z.einheit,z.name||z.zutat||z.text].filter(Boolean).join(" "));});
+    }
+    if(Array.isArray(r.zutatenGruppen)){
+      r.zutatenGruppen.forEach(g=>{if(g&&g.name) parts.push(g.name); (g.zutaten||[]).forEach(z=>{if(typeof z==="string") parts.push(z); else if(z) parts.push([z.menge,z.einheit,z.name||z.zutat||z.text].filter(Boolean).join(" "));});});
+    }
+    return norm(parts.join(" "));
+  }
+  function tagsText249(r){return Array.isArray(r.tags)?norm(r.tags.join(" ")):norm(r.tags||"");}
+  function selectedCategories249(){
+    const active=Array.from(document.querySelectorAll("#suchKategorieKacheln .aktiv, #suchKategorieKacheln .kategorie-kachel.aktiv, #suchKategorieKacheln .such-kategorie-kachel.aktiv"));
+    return active.map(el=>el.dataset?.kategorie||el.getAttribute("data-kategorie")||el.textContent||"").map(v=>String(v).trim()).filter(v=>v&&v.toLowerCase()!=="alle").map(norm);
+  }
+  function statusMatches249(r){
+    const status=value("suchAusprobiertInput");
+    if(!status) return true;
+    if(status==="true") return !!r.ausprobiert;
+    if(status==="false") return !r.ausprobiert;
+    return true;
+  }
+  function renderResults249(results){
+    const out=$("ergebnisse"); if(!out) return;
+    out.hidden=false; out.style.display=""; out.classList.remove("versteckt");
+    if(!results.length){out.innerHTML="<p>Keine Rezepte gefunden.</p>"; return;}
+    out.innerHTML=results.map(r=>`
+      <div class="rf249-rezeptkarte">
+        <h3>${esc(r.name||"Unbenanntes Rezept")}</h3>
+        <p><strong>Kategorie:</strong> ${esc(r.kategorie||"Nicht zugeordnet")}</p>
+        ${r.quelle?`<p><strong>Quelle:</strong> ${esc(r.quelle)}</p>`:""}
+        ${r.portionen?`<p><strong>Portionen:</strong> ${esc(r.portionen)}</p>`:""}
+        <div class="rf249-aktionen">
+          <button type="button" onclick="rezeptAnsehen(${r.index})">Ansehen</button>
+          <button type="button" onclick="rezeptBearbeiten(${r.index})">Bearbeiten</button>
+          <button type="button" onclick="rezeptLoeschen(${r.index})">Löschen</button>
+        </div>
+      </div>`).join("");
+  }
+  function search249(){
+    const list=loadRecipes249();
+    const nameQ=norm(value("suchNameInput"));
+    const zutQ=norm(value("suchZutatenInput"));
+    const tagQ=norm(value("suchTagInput")||value("suchTagsInput"));
+    const quelleQ=norm(value("suchQuelleInput"));
+    const cats=selectedCategories249();
+    let results=list.map((r,index)=>({...r,index,vorhandene:[],fehlende:[]}));
+    results=results.filter(r=>{
+      const cat=norm(r.kategorie||"Nicht zugeordnet");
+      return (!nameQ||norm(r.name).includes(nameQ))&&
+        (!zutQ||ingredientsText249(r).includes(zutQ))&&
+        (!tagQ||tagsText249(r).includes(tagQ))&&
+        (!quelleQ||norm(r.quelle).includes(quelleQ))&&
+        (!cats.length||cats.includes(cat))&&
+        statusMatches249(r);
+    });
+    const sort=value("suchSortierungInput")||"name";
+    if(sort==="name") results.sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"de",{sensitivity:"base"}));
+    if(sort==="kategorie") results.sort((a,b)=>String(a.kategorie||"").localeCompare(String(b.kategorie||""),"de",{sensitivity:"base"}));
+    if(sort==="neu") results.sort((a,b)=>String(b.aktualisiertAm||b.erstelltAm||"").localeCompare(String(a.aktualisiertAm||a.erstelltAm||"")));
+    window.letzteSuchErgebnisse=results; try{letzteSuchErgebnisse=results;}catch(e){}
+    renderResults249(results);
+    const counter=$("suchTrefferAnzeige"); if(counter) counter.textContent=results.length+" Treffer";
+    return false;
+  }
+  function openSearch249(){
+    document.body.classList.remove("rf205-start","startseite-clean");
+    ["formularBereich","textImportBereich","einkaufBereich","datenpruefungBereich"].forEach(id=>{const el=$(id); if(el){el.hidden=true; el.style.display="none"; el.classList.add("versteckt");}});
+    const search=$("rezeptSucheBereich")||$("sucheBereich");
+    if(search){search.hidden=false; search.style.display=""; search.classList.remove("versteckt");}
+    const out=$("ergebnisse"); if(out){out.hidden=false; out.style.display=""; out.classList.remove("versteckt");}
+    loadRecipes249();
+    return false;
+  }
+  function showAll249(){
+    const list=loadRecipes249();
+    const results=list.map((r,index)=>({...r,index,vorhandene:[],fehlende:[]})).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"de",{sensitivity:"base"}));
+    window.letzteSuchErgebnisse=results; try{letzteSuchErgebnisse=results;}catch(e){}
+    renderResults249(results);
+    const counter=$("suchTrefferAnzeige"); if(counter) counter.textContent=results.length+" Treffer";
+    return false;
+  }
+  window.rf249Search=search249;
+  window.rf249RenderResults=renderResults249;
+  window.rezeptSucheAusfuehren=search249;
+  window.filterAnwenden=showAll249;
+  try{rezeptSucheAusfuehren=search249; filterAnwenden=showAll249;}catch(e){}
+  function bind249(){
+    document.querySelectorAll("button").forEach(button=>{
+      const text=(button.textContent||"").trim().toLowerCase();
+      const onclick=button.getAttribute("onclick")||"";
+      if(text==="rezepte suchen"){
+        button.type="button"; button.onclick=function(event){if(event){event.preventDefault();event.stopPropagation();} return openSearch249();};
+      }
+      if(text==="suchen"||onclick.includes("rezeptSucheAusfuehren")){
+        button.type="button"; button.onclick=function(event){if(event){event.preventDefault();event.stopPropagation();} return search249();};
+      }
+      if(text==="alle anzeigen"||text==="alle rezepte anzeigen"||onclick.includes("filterAnwenden")){
+        button.type="button"; button.onclick=function(event){if(event){event.preventDefault();event.stopPropagation();} return showAll249();};
+      }
+    });
+    ["suchNameInput","suchZutatenInput","suchTagInput","suchQuelleInput","suchAusprobiertInput","suchSortierungInput"].forEach(id=>{const el=$(id); if(el&&el.dataset.rf249Bound!=="1"){el.dataset.rf249Bound="1"; el.addEventListener("change",search249);}});
+    document.querySelectorAll("#suchKategorieKacheln .kategorie-kachel, #suchKategorieKacheln .such-kategorie-kachel").forEach(k=>{if(k.dataset.rf249Bound==="1") return; k.dataset.rf249Bound="1"; k.addEventListener("click",()=>setTimeout(search249,80));});
+  }
+  window.addEventListener("load",function(){bind249(); setTimeout(bind249,300); setTimeout(bind249,1000); setTimeout(bind249,2000);});
+  window.rf249Diagnose=function(){const out=$("ergebnisse"); return {gespeicherteRezepte:loadRecipes249().length, letzteSuchErgebnisse:Array.isArray(window.letzteSuchErgebnisse)?window.letzteSuchErgebnisse.length:null, ergebnisHtmlLaenge:out?out.innerHTML.length:null, ergebnisText:out?out.textContent.slice(0,200):""};};
+})();
