@@ -34361,3 +34361,431 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+
+// =====================================================
+// VERSION 2.51 Sicherer Cloud-Sync
+// Audit-Ergebnis:
+// Alte Cloud-Funktionen enthielten mehrere widersprüchliche Wege:
+// - manche löschten vor Upload die gesamte Cloud
+// - manche überschrieben beim Download lokale Rezepte komplett
+// - manche konnten Upload-Loops auslösen
+//
+// Diese Version setzt EINEN aktiven sicheren Cloud-Pfad:
+// - Upload: upsert je Rezept, KEINE komplette Cloud-Löschung
+// - Download: Merge nach ID, lokale neue Rezepte bleiben erhalten
+// - Manuelle Buttons werden sauber neu gebunden
+// - Automatischer Upload nach Speichern bleibt deaktiviert
+// =====================================================
+
+(function () {
+  let rf251CloudBusy = false;
+  let rf251LastActionAt = 0;
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function status251(text, error) {
+    try {
+      if (typeof cloudStatus === "function") {
+        cloudStatus(text, !!error);
+        return;
+      }
+    } catch(e) {}
+
+    const el = $("cloudStatus");
+    if (el) el.textContent = text;
+    console.log(text);
+  }
+
+  function client251() {
+    try {
+      if (typeof cloudInit === "function") cloudInit();
+    } catch(e) {}
+
+    const client =
+      window.supabaseClient ||
+      (typeof supabaseClient !== "undefined" ? supabaseClient : null);
+
+    if (!client) throw new Error("Supabase ist nicht verbunden.");
+    return client;
+  }
+
+  function makeId251() {
+    try {
+      if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch(e) {}
+    return "r_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+  }
+
+  function parseRecipes251() {
+    try {
+      const data = JSON.parse(localStorage.getItem("rezepte") || "[]");
+      return Array.isArray(data) ? data : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function isValidRecipe251(r) {
+    return r &&
+      typeof r === "object" &&
+      !r.geloescht &&
+      !r.deleted &&
+      !r.__deleted &&
+      r.id !== "__rezeptfinder_deleted_keys__";
+  }
+
+  function normalizeRecipes251(list) {
+    if (!Array.isArray(list)) list = [];
+
+    const out = [];
+    const ids = new Set();
+
+    list.forEach(r => {
+      if (!isValidRecipe251(r)) return;
+
+      if (!r.id) r.id = makeId251();
+
+      if (ids.has(String(r.id))) {
+        r.id = makeId251();
+      }
+
+      ids.add(String(r.id));
+
+      if (!r.aktualisiertAm) {
+        r.aktualisiertAm = new Date().toISOString();
+      }
+
+      out.push(r);
+    });
+
+    return out;
+  }
+
+  function saveLocal251(list) {
+    list = normalizeRecipes251(list);
+
+    localStorage.setItem("rezepte", JSON.stringify(list));
+    localStorage.setItem("rezepte_rf235_sicherung", JSON.stringify(list));
+
+    window.rezepte = list;
+    try { rezepte = list; } catch(e) {}
+
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch(e) {}
+    try { if (typeof rf250RefreshTags === "function") rf250RefreshTags(); } catch(e) {}
+
+    return list;
+  }
+
+  function timestamp251(r) {
+    const t = Date.parse(r && (r.aktualisiertAm || r.aktualisiert_am || r.updated_at || r.erstelltAm || ""));
+    return Number.isFinite(t) ? t : 0;
+  }
+
+  function mergeRecipes251(localList, cloudList) {
+    const map = new Map();
+
+    normalizeRecipes251(localList).forEach(r => {
+      map.set(String(r.id), r);
+    });
+
+    normalizeRecipes251(cloudList).forEach(cloudRecipe => {
+      const key = String(cloudRecipe.id);
+      const localRecipe = map.get(key);
+
+      if (!localRecipe) {
+        map.set(key, cloudRecipe);
+        return;
+      }
+
+      // Neuere Version gewinnt. Falls Zeit gleich/fehlt, lokale Version behalten.
+      if (timestamp251(cloudRecipe) > timestamp251(localRecipe)) {
+        map.set(key, cloudRecipe);
+      }
+    });
+
+    return [...map.values()];
+  }
+
+  function recipeFromCloudRow251(row) {
+    if (!row) return null;
+
+    if (row.id === "__rezeptfinder_deleted_keys__") return null;
+
+    if (row.daten && typeof row.daten === "object") {
+      return {
+        ...row.daten,
+        id: row.daten.id || row.id,
+        aktualisiertAm: row.daten.aktualisiertAm || row.aktualisiert_am || row.updated_at || row.daten.erstelltAm || new Date().toISOString()
+      };
+    }
+
+    if (row.rezept && typeof row.rezept === "object") {
+      return {
+        ...row.rezept,
+        id: row.rezept.id || row.id,
+        aktualisiertAm: row.rezept.aktualisiertAm || row.aktualisiert_am || row.updated_at || row.rezept.erstelltAm || new Date().toISOString()
+      };
+    }
+
+    return {
+      id: row.id || makeId251(),
+      name: row.name || "Unbenanntes Rezept",
+      kategorie: row.kategorie || "Nicht zugeordnet",
+      portionen: row.portionen || "",
+      quelle: row.quelle || "",
+      zutaten: row.zutaten || [],
+      zutatenGruppen: row.zutatenGruppen || [],
+      zubereitung: row.zubereitung || "",
+      aktualisiertAm: row.aktualisiert_am || row.updated_at || new Date().toISOString()
+    };
+  }
+
+  async function cloudUpload251() {
+    const now = Date.now();
+
+    if (rf251CloudBusy || now - rf251LastActionAt < 1500) {
+      status251("Cloud-Aktion läuft bereits ...");
+      return false;
+    }
+
+    rf251CloudBusy = true;
+    rf251LastActionAt = now;
+
+    try {
+      const client = client251();
+      const localRecipes = saveLocal251(parseRecipes251());
+
+      if (!localRecipes.length) {
+        status251("Keine lokalen Rezepte zum Hochladen.");
+        return false;
+      }
+
+      status251("speichere sicher in Cloud ...");
+
+      // WICHTIG: Keine Cloud-Komplett-Löschung mehr.
+      // Nur vorhandene IDs werden aktualisiert, neue IDs werden ergänzt.
+      const rows = localRecipes.map(r => {
+        if (!r.id) r.id = makeId251();
+
+        const copy = JSON.parse(JSON.stringify(r));
+        copy.aktualisiertAm = copy.aktualisiertAm || new Date().toISOString();
+
+        return {
+          id: String(copy.id),
+          name: copy.name || "Unbenanntes Rezept",
+          daten: copy,
+          aktualisiert_am: copy.aktualisiertAm || new Date().toISOString()
+        };
+      });
+
+      const { error } = await client
+        .from("rezepte")
+        .upsert(rows, { onConflict: "id" });
+
+      if (error) throw error;
+
+      status251(rows.length + " Rezept(e) sicher in Cloud gespeichert.");
+      if (typeof meldungAnzeigen === "function") {
+        meldungAnzeigen(rows.length + " Rezept(e) sicher in Cloud gespeichert.");
+      }
+
+      return true;
+    } catch(e) {
+      console.error("Cloud-Speichern v2.51 Fehler:", e);
+      status251("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Speichern fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      setTimeout(() => {
+        rf251CloudBusy = false;
+      }, 1200);
+    }
+  }
+
+  async function cloudLoad251() {
+    const now = Date.now();
+
+    if (rf251CloudBusy || now - rf251LastActionAt < 1500) {
+      status251("Cloud-Aktion läuft bereits ...");
+      return false;
+    }
+
+    rf251CloudBusy = true;
+    rf251LastActionAt = now;
+
+    try {
+      const client = client251();
+      const localBefore = normalizeRecipes251(parseRecipes251());
+
+      status251("lade sicher aus Cloud ...");
+
+      const { data, error } = await client
+        .from("rezepte")
+        .select("*");
+
+      if (error) throw error;
+
+      const cloudRecipes = (Array.isArray(data) ? data : [])
+        .map(recipeFromCloudRow251)
+        .filter(Boolean);
+
+      const merged = mergeRecipes251(localBefore, cloudRecipes);
+      saveLocal251(merged);
+
+      status251(merged.length + " Rezept(e) nach Cloud-Merge lokal verfügbar.");
+      if (typeof meldungAnzeigen === "function") {
+        meldungAnzeigen(merged.length + " Rezept(e) nach Cloud-Merge lokal verfügbar.");
+      }
+
+      try { if (typeof rezeptSucheAusfuehren === "function") rezeptSucheAusfuehren(); } catch(e) {}
+
+      return true;
+    } catch(e) {
+      console.error("Cloud-Laden v2.51 Fehler:", e);
+      status251("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      alert("Cloud-Laden fehlgeschlagen: " + (e.message || "unbekannter Fehler"));
+      return false;
+    } finally {
+      setTimeout(() => {
+        rf251CloudBusy = false;
+      }, 1200);
+    }
+  }
+
+  async function cloudDeleteRecipe251(id) {
+    if (!id) return false;
+
+    try {
+      const client = client251();
+      const { error } = await client
+        .from("rezepte")
+        .delete()
+        .eq("id", String(id));
+
+      if (error) throw error;
+
+      status251("Rezept aus Cloud gelöscht.");
+      return true;
+    } catch(e) {
+      console.warn("Cloud-Löschen v2.51 fehlgeschlagen:", e);
+      status251("Cloud-Löschen fehlgeschlagen: " + (e.message || "unbekannter Fehler"), true);
+      return false;
+    }
+  }
+
+  // Aktive Cloud-Funktionen überschreiben.
+  window.rf251CloudSpeichern = cloudUpload251;
+  window.rf251CloudLaden = cloudLoad251;
+  window.rf251CloudRezeptLoeschen = cloudDeleteRecipe251;
+
+  window.cloudSpeichernAlle = cloudUpload251;
+  window.cloudSpeichernAlleDirekt = cloudUpload251;
+  window.cloudSpeichernAlleDirekt1294 = cloudUpload251;
+  window.rf215CloudSpeichern = cloudUpload251;
+  window.rf217ManualUpload = cloudUpload251;
+  window.rf177CloudSaveButton = cloudUpload251;
+
+  window.cloudLaden = cloudLoad251;
+  window.ausCloudLaden = cloudLoad251;
+  window.cloudHerunterladen = cloudLoad251;
+  window.rf240CloudLaden = cloudLoad251;
+  window.rf177CloudLoadButton = cloudLoad251;
+
+  window.cloudRezeptLoeschen = cloudDeleteRecipe251;
+
+  try {
+    cloudSpeichernAlle = cloudUpload251;
+    cloudSpeichernAlleDirekt = cloudUpload251;
+    cloudSpeichernAlleDirekt1294 = cloudUpload251;
+    cloudLaden = cloudLoad251;
+    ausCloudLaden = cloudLoad251;
+    cloudHerunterladen = cloudLoad251;
+    cloudRezeptLoeschen = cloudDeleteRecipe251;
+  } catch(e) {}
+
+  // Automatisches Cloud-Speichern nach lokalem Speichern deaktivieren.
+  // Cloud soll bewusst über Button passieren.
+  window.rf216AfterRecipeSaveUpload = function() { return false; };
+  window.rf217AfterRecipeSaveUpload = function() { return false; };
+
+  function bindCloudButtons251() {
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+      const onclick = button.getAttribute("onclick") || "";
+
+      if (
+        text === "jetzt in cloud speichern" ||
+        text.includes("cloud speichern") ||
+        onclick.includes("cloudSpeichernAlle")
+      ) {
+        button.type = "button";
+        button.removeAttribute("onclick");
+        button.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return cloudUpload251();
+        };
+      }
+
+      if (
+        text === "aus cloud laden" ||
+        text.includes("cloud laden") ||
+        onclick.includes("cloudLaden") ||
+        onclick.includes("ausCloudLaden") ||
+        onclick.includes("cloudHerunterladen")
+      ) {
+        button.type = "button";
+        button.removeAttribute("onclick");
+        button.onclick = function(event) {
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return cloudLoad251();
+        };
+      }
+    });
+  }
+
+  document.addEventListener("click", function(event) {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+
+    const text = (button.textContent || "").trim().toLowerCase();
+
+    if (text === "jetzt in cloud speichern" || text.includes("cloud speichern")) {
+      event.preventDefault();
+      event.stopPropagation();
+      return cloudUpload251();
+    }
+
+    if (text === "aus cloud laden" || text.includes("cloud laden")) {
+      event.preventDefault();
+      event.stopPropagation();
+      return cloudLoad251();
+    }
+  }, true);
+
+  window.addEventListener("load", function() {
+    bindCloudButtons251();
+    setTimeout(bindCloudButtons251, 300);
+    setTimeout(bindCloudButtons251, 1000);
+    setTimeout(bindCloudButtons251, 2000);
+  });
+
+  window.rf251CloudDiagnose = function() {
+    return {
+      lokaleRezepte: normalizeRecipes251(parseRecipes251()).length,
+      cloudBusy: rf251CloudBusy,
+      uploadFunktion: "upsert ohne Komplett-Löschung",
+      downloadFunktion: "merge lokal + cloud nach ID",
+      autoUploadNachSpeichern: "deaktiviert"
+    };
+  };
+})();
