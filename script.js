@@ -34176,3 +34176,188 @@ window.addEventListener("load", function () {
   window.addEventListener("load",function(){bind249(); setTimeout(bind249,300); setTimeout(bind249,1000); setTimeout(bind249,2000);});
   window.rf249Diagnose=function(){const out=$("ergebnisse"); return {gespeicherteRezepte:loadRecipes249().length, letzteSuchErgebnisse:Array.isArray(window.letzteSuchErgebnisse)?window.letzteSuchErgebnisse.length:null, ergebnisHtmlLaenge:out?out.innerHTML.length:null, ergebnisText:out?out.textContent.slice(0,200):""};};
 })();
+
+
+
+// =====================================================
+// VERSION 2.50 Tags in der Suche aktualisieren
+// Neue Tags aus gespeicherten Rezepten erscheinen im Tag-Suchfeld.
+// =====================================================
+
+(function () {
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function normalizeTag250(tag) {
+    return String(tag || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-");
+  }
+
+  function loadRecipes250() {
+    try {
+      const data = JSON.parse(localStorage.getItem("rezepte") || "[]");
+      return Array.isArray(data) ? data.filter(Boolean) : [];
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function collectAllTags250() {
+    const tags = new Set();
+
+    loadRecipes250().forEach(recipe => {
+      if (!recipe) return;
+
+      if (Array.isArray(recipe.tags)) {
+        recipe.tags.forEach(tag => {
+          const t = normalizeTag250(tag);
+          if (t) tags.add(t);
+        });
+      } else if (typeof recipe.tags === "string") {
+        recipe.tags.split(",").forEach(tag => {
+          const t = normalizeTag250(tag);
+          if (t) tags.add(t);
+        });
+      }
+    });
+
+    return [...tags].sort((a, b) =>
+      a.localeCompare(b, "de", { sensitivity: "base" })
+    );
+  }
+
+  function updateTagSearchDropdown250() {
+    const select =
+      $("suchTagInput") ||
+      $("suchTagsInput");
+
+    if (!select) return;
+
+    const previous = Array.from(select.selectedOptions || [])
+      .map(o => o.value);
+
+    const tags = collectAllTags250();
+
+    select.innerHTML = tags
+      .map(tag => `<option value="${tag}">${tag}</option>`)
+      .join("");
+
+    Array.from(select.options || []).forEach(option => {
+      if (previous.includes(option.value)) {
+        option.selected = true;
+      }
+    });
+  }
+
+  function updateTagDatalist250() {
+    const datalist = $("tagsListe");
+    if (!datalist) return;
+
+    const tags = collectAllTags250();
+
+    datalist.innerHTML = tags
+      .map(tag => `<option value="${tag}"></option>`)
+      .join("");
+  }
+
+  function refreshTags250() {
+    updateTagSearchDropdown250();
+    updateTagDatalist250();
+  }
+
+  function refreshTagsAfterSave250() {
+    setTimeout(refreshTags250, 100);
+    setTimeout(refreshTags250, 500);
+    setTimeout(refreshTags250, 1200);
+  }
+
+  const oldSave250 =
+    window.rezeptSpeichern ||
+    window.rf155RezeptSpeichern;
+
+  function saveWithTagRefresh250() {
+    let result = false;
+
+    if (typeof oldSave250 === "function" && oldSave250 !== saveWithTagRefresh250) {
+      result = oldSave250.apply(this, arguments);
+    }
+
+    refreshTagsAfterSave250();
+    return result;
+  }
+
+  window.rf250RefreshTags = refreshTags250;
+  window.rf250UpdateTagSearchDropdown = updateTagSearchDropdown250;
+  window.rf250UpdateTagDatalist = updateTagDatalist250;
+
+  window.rezeptSpeichern = saveWithTagRefresh250;
+  window.rf155RezeptSpeichern = saveWithTagRefresh250;
+  window.rezeptSpeichernDirektCloud = saveWithTagRefresh250;
+
+  try {
+    rezeptSpeichern = saveWithTagRefresh250;
+    rf155RezeptSpeichern = saveWithTagRefresh250;
+    rezeptSpeichernDirektCloud = saveWithTagRefresh250;
+  } catch(e) {}
+
+  function bind250() {
+    refreshTags250();
+
+    document.querySelectorAll("button").forEach(button => {
+      const text = (button.textContent || "").trim().toLowerCase();
+
+      if (text === "rezepte suchen" || text === "suchen") {
+        const oldClick = button.onclick;
+
+        button.onclick = function(event) {
+          refreshTags250();
+
+          if (oldClick && oldClick !== button.onclick) {
+            return oldClick.call(this, event);
+          }
+
+          return true;
+        };
+      }
+
+      if (text === "rezept speichern" || text === "speichern") {
+        const oldClick = button.onclick;
+
+        button.onclick = function(event) {
+          let result = true;
+
+          if (oldClick && oldClick !== button.onclick) {
+            result = oldClick.call(this, event);
+          } else {
+            result = saveWithTagRefresh250();
+          }
+
+          refreshTagsAfterSave250();
+          return result;
+        };
+      }
+    });
+  }
+
+  window.addEventListener("load", function() {
+    bind250();
+
+    setTimeout(bind250, 300);
+    setTimeout(bind250, 1000);
+    setTimeout(refreshTags250, 1500);
+  });
+
+  window.rf250Diagnose = function() {
+    const select = $("suchTagInput") || $("suchTagsInput");
+
+    return {
+      tagsAusRezepten: collectAllTags250(),
+      tagsImSuchfeld: select
+        ? Array.from(select.options || []).map(o => o.value)
+        : []
+    };
+  };
+})();
