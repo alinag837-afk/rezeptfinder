@@ -1,13 +1,25 @@
--- Rezeptfinder v1.33: Cloud-Backups / Versionierung + kein Login
+-- Rezeptfinder v2.53: Supabase Setup / Cloud-Backups / Versionierung ohne Login
+-- Hinweis: Diese Variante erlaubt dem anon key Lesen/Schreiben/Löschen.
+-- Für eine öffentlich verteilte App sollte später Auth + nutzerbezogene RLS verwendet werden.
 
--- Falls du vorher Login/RLS aktiviert hast, erlaubt dieser Block deiner privaten App wieder den Zugriff mit dem anon key.
+create table if not exists public.rezepte (
+  id text primary key,
+  name text,
+  daten jsonb,
+  aktualisiert_am timestamp with time zone default now()
+);
+
+alter table public.rezepte
+  add column if not exists name text,
+  add column if not exists daten jsonb,
+  add column if not exists aktualisiert_am timestamp with time zone default now();
+
 alter table public.rezepte enable row level security;
 
 drop policy if exists "Eigene Rezepte lesen" on public.rezepte;
 drop policy if exists "Eigene Rezepte erstellen" on public.rezepte;
 drop policy if exists "Eigene Rezepte aktualisieren" on public.rezepte;
 drop policy if exists "Eigene Rezepte löschen" on public.rezepte;
-
 drop policy if exists "Rezepte lesen erlauben" on public.rezepte;
 drop policy if exists "Rezepte erstellen erlauben" on public.rezepte;
 drop policy if exists "Rezepte aktualisieren erlauben" on public.rezepte;

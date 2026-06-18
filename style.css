@@ -1175,3 +1175,33 @@ body.rf205-start #rf205BackupPanel {
 .rf249-rezeptkarte{background:#fff;border:1px solid #dbe3ef;border-radius:16px;padding:16px;margin:14px 0;box-shadow:0 2px 8px rgba(15,23,42,.06)}
 .rf249-rezeptkarte h3{margin-top:0}
 .rf249-aktionen{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+
+/* VERSION 2.53 Review-Fix: stabile Sichtbarkeit und saubere Button-Gruppen */
+#ergebnisse[hidden],
+section[hidden] {
+  display: none !important;
+}
+
+.cloud-status > .button-gruppe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cloud-status > .button-gruppe button,
+.start-buttons button {
+  min-height: 44px;
+}
+
+.rf249-rezeptkarte .rezept-ausprobiert {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 700px) {
+  .cloud-status > .button-gruppe {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

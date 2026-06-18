@@ -35259,3 +35259,372 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+
+// =====================================================
+// VERSION 2.53 Stabilisierung / Review-Fix
+// Ziel: keine Funktion entfernen, aber UI-Bindings, Suche,
+// Meldungen und dynamische Listen zuverlässig machen.
+// =====================================================
+(function () {
+  "use strict";
+
+  const STORAGE_KEY = "rezepte";
+  const SAFE_KEY = "rezepte_rf235_sicherung";
+  let lastMessage = { text: "", at: 0 };
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function parseList(raw) {
+    try {
+      const parsed = JSON.parse(raw || "[]");
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch (error) {
+      console.warn("Rezepte konnten nicht gelesen werden:", error);
+      return [];
+    }
+  }
+
+  function loadRecipes() {
+    const primary = parseList(localStorage.getItem(STORAGE_KEY));
+    const backup = parseList(localStorage.getItem(SAFE_KEY));
+    const list = primary.length >= backup.length ? primary : backup;
+    try { rezepte = list; } catch (error) {}
+    window.rezepte = list;
+    return list;
+  }
+
+  function saveRecipes(list) {
+    const clean = Array.isArray(list) ? list.filter(Boolean) : [];
+    const json = JSON.stringify(clean);
+    localStorage.setItem(STORAGE_KEY, json);
+    localStorage.setItem(SAFE_KEY, json);
+    try { rezepte = clean; } catch (error) {}
+    window.rezepte = clean;
+    return clean;
+  }
+
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function normalized(value) {
+    return String(value || "")
+      .toLowerCase()
+      .trim()
+      .replace(/ä/g, "ae")
+      .replace(/ö/g, "oe")
+      .replace(/ü/g, "ue")
+      .replace(/ß/g, "ss");
+  }
+
+  function asText(value) {
+    if (Array.isArray(value)) return value.map(asText).join(" ");
+    if (value && typeof value === "object") return Object.values(value).map(asText).join(" ");
+    return String(value || "");
+  }
+
+  function selectedValues(selectId) {
+    const el = $(selectId);
+    if (!el) return [];
+    return Array.from(el.selectedOptions || [])
+      .map(option => option.value)
+      .filter(Boolean);
+  }
+
+  function selectedCategoryValues(containerId) {
+    const container = $(containerId);
+    if (!container) return [];
+    const active = Array.from(container.querySelectorAll(".aktiv"))
+      .map(button => button.dataset.kategorie || "")
+      .filter(Boolean);
+    return active;
+  }
+
+  function showOnly(idsToShow) {
+    const ids = [
+      "sucheBereich",
+      "rezeptSucheBereich",
+      "formularBereich",
+      "einkaufBereich",
+      "textImportBereich",
+      "datenpruefungBereich"
+    ];
+
+    ids.forEach(id => {
+      const el = $(id);
+      if (!el) return;
+      const visible = idsToShow.includes(id);
+      el.hidden = !visible;
+      el.style.display = visible ? "" : "none";
+      el.classList.toggle("versteckt", !visible);
+    });
+
+    document.body.classList.remove("rf205-start", "rf196-startseite", "startseite-clean");
+  }
+
+  function renderResults(results) {
+    const out = $("ergebnisse");
+    if (!out) return;
+
+    out.hidden = false;
+    out.style.display = "";
+    out.classList.remove("versteckt");
+
+    const count = $("suchTrefferAnzeige");
+    if (count) count.textContent = `${results.length} Treffer`;
+
+    if (!results.length) {
+      out.innerHTML = "<p>Keine Rezepte gefunden.</p>";
+      return;
+    }
+
+    out.innerHTML = results.map(recipe => {
+      const tags = Array.isArray(recipe.tags) && recipe.tags.length
+        ? `<p><strong>Tags:</strong> ${recipe.tags.map(esc).join(", ")}</p>`
+        : "";
+      const status = recipe.ausprobiert === true
+        ? '<span class="rezept-ausprobiert status-ja">Schon ausprobiert</span>'
+        : '<span class="rezept-ausprobiert status-nein">Noch nicht ausprobiert</span>';
+
+      return `
+        <article class="rf249-rezeptkarte">
+          <h3>${esc(recipe.name || "Unbenanntes Rezept")}</h3>
+          <p><strong>Kategorie:</strong> ${esc(recipe.kategorie || "Nicht zugeordnet")}</p>
+          ${recipe.quelle ? `<p><strong>Quelle:</strong> ${esc(recipe.quelle)}</p>` : ""}
+          ${recipe.portionen ? `<p><strong>Portionen:</strong> ${esc(recipe.portionen)}</p>` : ""}
+          ${tags}
+          ${status}
+          <div class="rf249-aktionen">
+            <button type="button" onclick="rezeptAnsehen(${recipe.index})">Ansehen</button>
+            <button type="button" onclick="rezeptBearbeiten(${recipe.index})">Bearbeiten</button>
+            <button type="button" onclick="rezeptLoeschen(${recipe.index})">Löschen</button>
+          </div>
+        </article>`;
+    }).join("");
+  }
+
+  function sortResults(results, sortValue) {
+    const sorted = [...results];
+    if (sortValue === "bewertung") {
+      sorted.sort((a, b) => Number(b.bewertung || 0) - Number(a.bewertung || 0));
+    } else if (sortValue === "neu") {
+      sorted.sort((a, b) => Date.parse(b.aktualisiertAm || b.erstelltAm || 0) - Date.parse(a.aktualisiertAm || a.erstelltAm || 0));
+    } else if (sortValue === "kategorie") {
+      sorted.sort((a, b) => String(a.kategorie || "").localeCompare(String(b.kategorie || ""), "de") || String(a.name || "").localeCompare(String(b.name || ""), "de"));
+    } else {
+      sorted.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "de", { sensitivity: "base" }));
+    }
+    return sorted;
+  }
+
+  function runSearch(showSearchPanel) {
+    const list = loadRecipes();
+    const nameQuery = normalized($("suchNameInput")?.value || "");
+    const ingredientsQuery = normalized($("suchZutatenInput")?.value || "");
+    const sourceQuery = normalized($("suchQuelleInput")?.value || "");
+    const statusQuery = $("suchAusprobiertInput")?.value || "";
+    const tagQueries = selectedValues("suchTagInput").map(normalized);
+    const categories = [
+      ...selectedCategoryValues("suchKategorieKacheln"),
+      ...selectedCategoryValues("kategorienFilter")
+    ];
+    const uniqueCategories = [...new Set(categories)].filter(Boolean);
+    const sortValue = $("suchSortierungInput")?.value || $("sortierungInput")?.value || "name";
+
+    let results = list.map((recipe, index) => ({ ...recipe, index, vorhandene: [], fehlende: [] }));
+
+    if (nameQuery) {
+      results = results.filter(recipe => normalized(recipe.name).includes(nameQuery));
+    }
+
+    if (ingredientsQuery) {
+      results = results.filter(recipe => normalized(asText(recipe.zutatenGruppen || recipe.zutaten)).includes(ingredientsQuery));
+    }
+
+    if (sourceQuery) {
+      results = results.filter(recipe => normalized(recipe.quelle).includes(sourceQuery));
+    }
+
+    if (statusQuery) {
+      results = results.filter(recipe => String(!!recipe.ausprobiert) === statusQuery);
+    }
+
+    if (tagQueries.length) {
+      results = results.filter(recipe => {
+        const recipeTags = (recipe.tags || []).map(normalized);
+        return tagQueries.every(tag => recipeTags.includes(tag));
+      });
+    }
+
+    if (uniqueCategories.length) {
+      results = results.filter(recipe => uniqueCategories.includes(recipe.kategorie || "Nicht zugeordnet"));
+    }
+
+    results = sortResults(results, sortValue);
+    window.letzteSuchErgebnisse = results;
+    try { letzteSuchErgebnisse = results; } catch (error) {}
+
+    if (showSearchPanel) showOnly(["rezeptSucheBereich"]);
+    renderResults(results);
+    return false;
+  }
+
+  function showAllRecipes() {
+    const allButton = $("kategorienFilter")?.querySelector('[data-kategorie=""]');
+    if (allButton) {
+      $("kategorienFilter").querySelectorAll(".kategorie-kachel").forEach(btn => btn.classList.remove("aktiv"));
+      allButton.classList.add("aktiv");
+    }
+    showOnly(["sucheBereich"]);
+    const results = sortResults(loadRecipes().map((recipe, index) => ({ ...recipe, index, vorhandene: [], fehlende: [] })), $("sortierungInput")?.value || "name");
+    window.letzteSuchErgebnisse = results;
+    try { letzteSuchErgebnisse = results; } catch (error) {}
+    renderResults(results);
+    return false;
+  }
+
+  function refreshDynamicLists() {
+    const list = loadRecipes();
+
+    const sources = [...new Set(list.map(r => String(r.quelle || "").trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "de"));
+    const tags = [...new Set(list.flatMap(r => Array.isArray(r.tags) ? r.tags : []).map(t => String(t).trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "de"));
+
+    const sourceSelect = $("suchQuelleInput");
+    if (sourceSelect) {
+      const current = sourceSelect.value;
+      sourceSelect.innerHTML = '<option value="">Alle Quellen</option>' + sources.map(source => `<option value="${esc(source)}">${esc(source)}</option>`).join("");
+      sourceSelect.value = current;
+    }
+
+    const sourceList = $("quellenListe");
+    if (sourceList) sourceList.innerHTML = sources.map(source => `<option value="${esc(source)}"></option>`).join("");
+
+    const tagSelect = $("suchTagInput");
+    if (tagSelect) {
+      const current = selectedValues("suchTagInput");
+      tagSelect.innerHTML = tags.map(tag => `<option value="${esc(tag)}">${esc(tag)}</option>`).join("");
+      current.forEach(value => {
+        const option = Array.from(tagSelect.options).find(o => o.value === value);
+        if (option) option.selected = true;
+      });
+    }
+
+    try { if (typeof dashboardAktualisieren === "function") dashboardAktualisieren(); } catch (error) {}
+  }
+
+  function wrapMessages() {
+    if (typeof window.meldungAnzeigen !== "function" || window.meldungAnzeigen.__rf253Wrapped) return;
+    const original = window.meldungAnzeigen;
+    window.meldungAnzeigen = function (text, isError) {
+      const now = Date.now();
+      const message = String(text || "");
+      if (!isError && message === lastMessage.text && now - lastMessage.at < 2500) return;
+      lastMessage = { text: message, at: now };
+      return original.apply(this, arguments);
+    };
+    window.meldungAnzeigen.__rf253Wrapped = true;
+    try { meldungAnzeigen = window.meldungAnzeigen; } catch (error) {}
+  }
+
+  function bindButtons() {
+    const bindings = [
+      ["rf207AlleRezepte", showAllRecipes],
+      ["rf207RezepteSuchen", () => { showOnly(["rezeptSucheBereich"]); refreshDynamicLists(); return false; }],
+      ["rf207RezeptHinzufuegen", () => { showOnly(["formularBereich"]); if (typeof formularLeeren === "function") formularLeeren(); return false; }],
+      ["rf207Einkaufsliste", () => { showOnly(["einkaufBereich"]); if (typeof einkaufslisteErstellen === "function") einkaufslisteErstellen(); return false; }],
+      ["rf207RezeptAssistent", () => { showOnly(["textImportBereich"]); return false; }],
+      ["rf207RezeptePruefen", () => { showOnly(["datenpruefungBereich"]); if (typeof datenqualitaetPruefen === "function") datenqualitaetPruefen(); return false; }]
+    ];
+
+    bindings.forEach(([id, handler]) => {
+      const button = $(id);
+      if (!button || button.__rf253Bound) return;
+      button.type = "button";
+      button.removeAttribute("onclick");
+      button.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        handler();
+      });
+      button.__rf253Bound = true;
+    });
+
+    const searchButtons = Array.from(document.querySelectorAll("button"))
+      .filter(button => (button.textContent || "").trim().toLowerCase() === "suchen");
+    searchButtons.forEach(button => {
+      if (button.__rf253SearchBound) return;
+      button.type = "button";
+      button.addEventListener("click", event => {
+        if (!$("rezeptSucheBereich")?.contains(button)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        runSearch(true);
+      }, true);
+      button.__rf253SearchBound = true;
+    });
+  }
+
+  function patchGlobals() {
+    window.rf253ShowAllRecipes = showAllRecipes;
+    window.rf253Search = () => runSearch(true);
+    window.rf253RefreshLists = refreshDynamicLists;
+
+    window.filterAnwenden = showAllRecipes;
+    window.alleRezepteAnzeigen = showAllRecipes;
+    window.alleRezepteStartAnzeigen = showAllRecipes;
+    window.rezeptSucheAusfuehren = () => runSearch(true);
+
+    try {
+      filterAnwenden = showAllRecipes;
+      alleRezepteAnzeigen = showAllRecipes;
+      alleRezepteStartAnzeigen = showAllRecipes;
+      rezeptSucheAusfuehren = window.rezeptSucheAusfuehren;
+    } catch (error) {}
+  }
+
+  document.addEventListener("click", event => {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+
+    const text = (button.textContent || "").trim().toLowerCase();
+    if (button.id === "rf207AlleRezepte" || text === "alle rezepte anzeigen" || text === "alle anzeigen") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showAllRecipes();
+      return;
+    }
+
+    if (button.id === "rf235SaveButton" || text === "rezept speichern" || text === "speichern") {
+      setTimeout(refreshDynamicLists, 150);
+    }
+  }, true);
+
+  window.addEventListener("load", () => {
+    wrapMessages();
+    refreshDynamicLists();
+    bindButtons();
+    patchGlobals();
+    setTimeout(() => { wrapMessages(); refreshDynamicLists(); bindButtons(); patchGlobals(); }, 300);
+    setTimeout(() => { wrapMessages(); refreshDynamicLists(); bindButtons(); patchGlobals(); }, 1200);
+  });
+
+  window.rf253Diagnose = function () {
+    return {
+      version: "2.53",
+      lokaleRezepte: loadRecipes().length,
+      alleRezepteButton: !!$("rf207AlleRezepte"),
+      suchButton: !!$("rf207RezepteSuchen"),
+      meldungenEntprellt: !!(window.meldungAnzeigen && window.meldungAnzeigen.__rf253Wrapped)
+    };
+  };
+})();
