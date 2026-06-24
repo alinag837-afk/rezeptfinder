@@ -35724,3 +35724,63 @@ window.addEventListener("load", function () {
   window.addEventListener("load",function(){ start(); setTimeout(normalizeIngredientRows,300); });
   window.rf266NormalizeIngredientRows=normalizeIngredientRows;
 })();
+
+// =====================================================
+// VERSION 2.67 - Nur Papierkorb-Buttons entfernen/ausblenden
+// Ziel: Startseite unverändert lassen. Der sichtbare Button "Entfernen"
+// bleibt bestehen und löscht die jeweilige Zutatenzeile.
+// =====================================================
+(function(){
+  function removeOldTrashButtons(){
+    var container=document.getElementById("zutatenGruppen");
+    if(!container) return;
+    container.querySelectorAll(".rf239-zutat-loeschen,.rf241-zutat-loeschen,.rf243-zutat-loeschen").forEach(function(btn){
+      btn.remove();
+    });
+    container.querySelectorAll(".zutaten-zeile,.zutat-zeile").forEach(function(row){
+      // Falls eine alte Version wieder einen reinen Papierkorb-Button ohne Klasse erzeugt.
+      Array.from(row.querySelectorAll("button")).forEach(function(btn){
+        var text=String(btn.textContent||"").trim();
+        var title=String(btn.title||"").toLowerCase();
+        if(text==="🗑" || title==="zutat löschen" || title==="zutat loeschen") btn.remove();
+      });
+      var entfernen=Array.from(row.querySelectorAll("button")).filter(function(btn){
+        return String(btn.textContent||"").trim().toLowerCase()==="entfernen";
+      });
+      if(entfernen.length>1){
+        entfernen.slice(1).forEach(function(btn){btn.remove();});
+      }
+      if(entfernen[0]){
+        entfernen[0].type="button";
+        entfernen[0].classList.add("rf267-zutat-entfernen");
+        entfernen[0].onclick=function(event){
+          if(event){event.preventDefault(); event.stopPropagation();}
+          var zeile=this.closest(".zutaten-zeile,.zutat-zeile");
+          if(zeile) zeile.remove();
+          return false;
+        };
+      }
+    });
+  }
+
+  var pending=false;
+  function schedule(){
+    if(pending) return;
+    pending=true;
+    setTimeout(function(){pending=false; removeOldTrashButtons();},50);
+  }
+
+  function start(){
+    removeOldTrashButtons();
+    var container=document.getElementById("zutatenGruppen");
+    if(container && container.dataset.rf267Observer!=="1"){
+      container.dataset.rf267Observer="1";
+      new MutationObserver(schedule).observe(container,{childList:true,subtree:true});
+    }
+  }
+
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start);
+  else start();
+  window.addEventListener("load",function(){start(); setTimeout(removeOldTrashButtons,300); setTimeout(removeOldTrashButtons,1000);});
+  window.rf267RemoveOldTrashButtons=removeOldTrashButtons;
+})();
