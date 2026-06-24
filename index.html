@@ -8,8 +8,8 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Rezeptfinder v2.53 Cloud</title>
-  <link rel="stylesheet" href="style.css?v=253">
+  <title>Rezeptfinder v2.54 Cloud</title>
+  <link rel="stylesheet" href="style.css?v=254">
 </head>
 <body>
 <main class="container">
@@ -27,7 +27,7 @@
     <p id="letztesRezept"></p>
     <p id="backupHinweis"></p>
     <p id="dashboardDebug" class="hinweis"></p>
-    <p class="version">Rezeptfinder v2.53 Cloud</p>
+    <p class="version">Rezeptfinder v2.54 Cloud</p>
     <div id="cloudStatusBox" class="cloud-status">
       <strong>Cloud:</strong> <span id="cloudStatusText">wird verbunden ...</span>
       <div class="button-gruppe">
@@ -95,9 +95,9 @@
   </select>
 
   <div class="button-gruppe">
-    <button onclick="filterAnwenden()">Alle anzeigen</button>
-    <button onclick="kategorienAufAlleSetzen()">Alle Kategorien auswählen</button>
-    <button onclick="sucheZuruecksetzen()">Zurücksetzen</button>
+    <button type="button" data-action="show-all">Alle anzeigen</button>
+    <button type="button" data-action="select-all-categories">Alle Kategorien auswählen</button>
+    <button type="button" data-action="reset-all-search">Zurücksetzen</button>
   </div>
 </section>
 
@@ -124,7 +124,7 @@
       <input id="portionenInput" type="number" min="1" placeholder="Grundportionen, z. B. 4">
       <p class="hinweis">Zutaten können Gruppen haben, z. B. Teig, Fülle, Glasur.</p>
       <div id="zutatenGruppen"></div>
-      <button type="button" onclick="zutatenGruppeHinzufuegen()">Zutatengruppe hinzufügen</button>
+      <button type="button" data-action="add-ingredient-group">Zutatengruppe hinzufügen</button>
     </div>
     <div class="formular-gruppe"><h3>Besondere Utensilien / Utensilien</h3><textarea id="utensilienInput" placeholder="z. B. Pfanne, Schneebesen"></textarea></div>
     <div class="formular-gruppe"><h3>Zubereitung</h3><textarea id="zubereitungInput" class="zubereitung-gross" placeholder="Jeden Schritt mit Punkt trennen."></textarea></div>
@@ -172,14 +172,14 @@
 
         <h3>Zusatzinfos</h3><textarea id="notizenInput" placeholder="Notizen"></textarea><textarea id="tagsInput" list="tagsListe" placeholder="Tags, mit Komma getrennt"></textarea></div>
     <button id="rf235SaveButton" type="button">Rezept speichern</button>
-    <button onclick="formularLeeren()">Formular leeren</button>
+    <button type="button" data-action="clear-form">Formular leeren</button>
   </section>
 
   <section class="box versteckt" id="einkaufBereich">
     <h2>Einkaufsliste</h2>
     <p>Füge Zutaten direkt aus einem Rezept hinzu. Danach kannst du hier die Liste erstellen, als PDF speichern oder zurücksetzen.</p>
-<button onclick="einkaufslisteDrucken()">Download / PDF</button>
-    <button onclick="einkaufslisteZuruecksetzen()">Einkaufsliste zurücksetzen</button>
+<button type="button" data-action="print-shopping-list">Download / PDF</button>
+    <button type="button" data-action="reset-shopping-list">Einkaufsliste zurücksetzen</button>
     <ul id="einkaufsliste"></ul>
   </section>
 
@@ -226,8 +226,8 @@
   </select>
 
   <div class="button-gruppe">
-    <button onclick="rezeptSucheAusfuehren()">Suchen</button>
-    <button onclick="rezeptSucheZuruecksetzen()">Suche löschen</button>
+    <button type="button" data-action="recipe-search">Suchen</button>
+    <button type="button" data-action="recipe-search-reset">Suche löschen</button>
   </div>
 
   <p id="suchTrefferAnzeige" class="treffer-anzeige"></p>
@@ -263,8 +263,8 @@ Fülle auf den Teig geben.
 30 min backen."
       ></textarea>
 
-      <button id="rezeptAnalysierenButton" type="button" onclick="window.rf153AssistentVorschau()">Rezept analysieren</button>
-      <button id="rezeptAssistentResetButton" type="button" onclick="rezeptAssistentZuruecksetzen()">Zurücksetzen</button>
+      <button id="rezeptAnalysierenButton" type="button" data-action="assistant-analyze">Rezept analysieren</button>
+      <button id="rezeptAssistentResetButton" type="button" data-action="assistant-reset">Zurücksetzen</button>
 
       <p id="assistentStatus" class="hinweis-klein"></p>
       <div id="assistentVorschau" class="assistent-vorschau"></div>
@@ -273,10 +273,11 @@ Fülle auf den Teig geben.
 
   <section class="box versteckt" id="datenpruefungBereich"><h2>Rezeptprüfung</h2><div id="datenpruefungInhalt"></div></section>
 <section id="ergebnisse"></section>
-  <footer>Rezeptfinder v2.53 Cloud</footer>
+  <footer>Rezeptfinder v2.54 Cloud</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=253"></script>
+  <script src="script.js?v=254"></script>
+  <script type="module" src="js/rf-main.js?v=254"></script>
 
 <select id="bewertungFilter" class="versteckt"><option value=""></option></select>
 <div id="schnellfilterInhalt" class="versteckt"></div>

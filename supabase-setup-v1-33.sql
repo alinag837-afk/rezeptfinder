@@ -1,4 +1,4 @@
--- Rezeptfinder v2.53: Supabase Setup / Cloud-Backups / Versionierung ohne Login
+-- Rezeptfinder v2.54: Supabase Setup / Cloud-Backups / Versionierung ohne Login
 -- Hinweis: Diese Variante erlaubt dem anon key Lesen/Schreiben/Löschen.
 -- Für eine öffentlich verteilte App sollte später Auth + nutzerbezogene RLS verwendet werden.
 
@@ -81,3 +81,11 @@ on public.rezept_backups
 for delete
 to anon
 using (true);
+
+-- Rezeptfinder v2.54: zusätzliche Stabilität für Cloud-Suche und Backups
+create index if not exists rezepte_name_idx on public.rezepte using btree (name);
+create index if not exists rezepte_aktualisiert_am_idx on public.rezepte using btree (aktualisiert_am desc);
+create index if not exists rezept_backups_erstellt_am_idx on public.rezept_backups using btree (erstellt_am desc);
+
+alter table public.rezept_backups
+  add column if not exists app_version text default '2.54';

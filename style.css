@@ -1,6 +1,5 @@
 body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.container{max-width:950px;margin:40px auto;background:#fff;padding:25px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.06)}.box{margin-bottom:30px;padding:20px;background:#f7faff;border:1px solid #e2e8f0;border-radius:10px}.versteckt{display:none}.version,.hinweis{color:#666;font-size:14px}.start-buttons{text-align:center}.start-buttons button{min-width:180px}.formular-gruppe{margin-top:20px;padding:15px;background:white;border-radius:10px}.formular-gruppe h3{margin-top:0;color:#2d7ff9}input,select,textarea{width:100%;margin-top:10px;padding:12px;font-size:16px;box-sizing:border-box}textarea{min-height:80px}button{margin-top:15px;margin-right:8px;padding:10px 16px;font-size:15px;cursor:pointer;border:none;border-radius:8px;background:#2d7ff9;color:white;transition:.15s}button:hover{background:#1d63c8}button:disabled{background:#999}.meldung{display:none;padding:12px;margin-bottom:20px;border-radius:8px;background:#e7f5e7;color:#1b5e20}.meldung.fehler{background:#fdecea;color:#b00020}.dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:15px;margin-top:15px}.dashboard-card{background:white;padding:15px;border-radius:10px;text-align:center}.dashboard-card h3{margin:0;font-size:32px;color:#2d7ff9}.dashboard-card p{margin-top:8px;color:#555}.schnellfilter{margin-top:20px;padding-top:15px;border-top:1px solid #d0dff5}.schnellfilter button,.kategorie-buttons button{background:white;color:#2d7ff9;border:1px solid #2d7ff9;border-radius:999px}.schnellfilter button:hover,.kategorie-buttons button:hover,.kategorie-kachel.aktiv{background:#2d7ff9;color:white}.kategorie-buttons{display:flex;flex-wrap:wrap;gap:8px;margin:15px 0}.kategorie-buttons button{margin:0}.zutatengruppe{background:#f8fbff;border:1px solid #dce8f8;border-radius:10px;padding:12px;margin-top:15px}.zutatengruppe-kopf{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.zutaten-zeile{display:grid;grid-template-columns:1fr 1fr 2fr auto;gap:8px;margin-top:10px}.zutaten-zeile input,.zutaten-zeile select,.zutatengruppe-kopf input{margin-top:0}.zutaten-zeile button,.zutatengruppe-kopf button{margin-top:0;background:#b00020}.rezept{margin-top:15px;border-left:4px solid #2d7ff9;background:white;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.04)}.rezept-kopf{padding:15px;cursor:pointer}.rezept-kopf:hover{background:#f0f6ff}.rezept-kopf h2{margin:0 0 5px}.rezept-details{display:none;padding:0 15px 15px}.rezept.offen .rezept-details{display:block}.kategorie-label{color:#555;font-size:14px}.zutaten-gruppe-anzeige{margin-bottom:12px}.zutaten-gruppe-anzeige h4{margin-bottom:5px}.fehlend{color:#b00020}.vorhanden{color:#137333}.abgehakt{text-decoration:line-through;color:#888}.bewertung{margin-top:15px}.stern-button{background:none;color:#f5a400;font-size:24px;padding:0 3px;margin:0}.stern-button:hover{background:none;transform:scale(1.1)}.zutat-ersetzen-box{margin-top:20px;padding:12px;background:#eef7ee;border-radius:8px}#einkaufsliste li{margin-bottom:8px}.kochmodus{margin-top:20px;padding:15px;background:#fff7e6;border-radius:10px}.kochschritt{margin-bottom:12px;padding:10px;background:white;border-radius:8px}.kochschritt input{width:auto;margin-right:8px}.kochschritt p{margin-left:25px;color:#555}.timer-box{margin-top:10px;margin-left:25px}.timer-box input{width:140px}.timer-box span{margin-left:10px;font-weight:bold}.timer-meldung{margin-top:8px;font-weight:bold}.timer-fertig{color:#b00020}#undoButton{position:fixed;bottom:20px;right:20px;background:#ff9800;color:white;z-index:1000}.rezept-details button{margin-bottom:6px}footer{margin-top:30px;text-align:center;color:#777;font-size:14px}@media(max-width:600px){.container{margin:0;border-radius:0;padding:15px}.zutaten-zeile,.zutatengruppe-kopf{grid-template-columns:1fr}button{width:100%;margin-right:0;min-height:44px}input,select,textarea{min-height:44px;font-size:16px}.kategorie-buttons{display:grid;grid-template-columns:1fr 1fr}}
 
-
 .rezept-des-tages {
   margin-top: 20px;
   padding: 15px;
@@ -8,16 +7,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   border-radius: 10px;
   border: 1px solid #e2e8f0;
 }
-
-
-
-
-
-
-
-
-
-
 
 .assistent-vorschau {
   margin-top: 20px;
@@ -31,15 +20,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   margin-top: 0;
 }
 
-
-
-
-
-
-
-
-
-
 .kategorien-grid {
   display: flex;
   flex-wrap: wrap;
@@ -50,7 +30,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 .kategorien-grid button {
   margin: 0;
 }
-
 
 .such-kategorie-kachel {
   background: white;
@@ -65,19 +44,16 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   color: white;
 }
 
-
 .zubereitung-gross {
   min-height: 220px;
   resize: vertical;
 }
-
 
 .treffer-anzeige {
   margin-top: 12px;
   font-weight: bold;
   color: #2d7ff9;
 }
-
 
 .naehrwerte-grid {
   display: grid;
@@ -93,7 +69,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   background: #f3f7ff;
 }
 
-
 .naehrwert-rechner {
   margin-top: 12px;
   padding-top: 10px;
@@ -103,7 +78,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 .naehrwert-ergebnis {
   margin-top: 10px;
 }
-
 
 .naehrwert-tags {
   margin-top: 10px;
@@ -118,7 +92,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   color: #1d4ed8;
   font-size: 0.9rem;
 }
-
 
 .auto-backup-box {
   margin-top: 18px;
@@ -136,11 +109,9 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   border: 1px solid #e5e7eb;
 }
 
-
 #suchTagInput {
   min-height: 120px;
 }
-
 
 .cloud-status {
   margin: 14px 0;
@@ -153,7 +124,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 .cloud-status .button-gruppe {
   margin-top: 8px;
 }
-
 
 .offline-status {
   margin-top: 8px;
@@ -172,7 +142,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   border: 1px solid #dbeafe;
 }
 
-
 .rezept-ausprobiert {
   margin-top: 10px;
   padding: 6px 10px;
@@ -183,7 +152,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   background: #fef3c7;
   color: #92400e;
 }
-
 
 .rezept-ausprobiert {
   margin-top: 10px;
@@ -211,7 +179,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   background: white;
   border: 1px solid #e2e8f0;
 }
-
 
 /* VERSION 1.46 Komfortlayout */
 .rezept-detail-modern {
@@ -338,7 +305,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   opacity: 0.65;
 }
 
-
 /* VERSION 1.48 */
 .einkauf-auswahl-gruppe {
   margin: 10px 0;
@@ -357,7 +323,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   margin-top: 14px;
   margin-bottom: 6px;
 }
-
 
 /* VERSION 1.49 echte Umsetzungen */
 .einkauf-auswahl-gruppe {
@@ -420,7 +385,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   margin-bottom:4px;
 }
 
-
 /* VERSION 1.50 Rezept-Assistent Vorschau */
 .assistent-preview-grid {
   display: grid;
@@ -441,7 +405,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   margin-top: 14px;
   font-weight: 700;
 }
-
 
 /* VERSION 1.57 Suche */
 .tag-filter-chip,
@@ -469,7 +432,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   color: #1e293b !important;
 }
 
-
 /* VERSION 1.60 Kategorieauswahl sichtbar */
 #suchKategorieKacheln .kategorie-kachel,
 #kategorienFilter .kategorie-kachel {
@@ -490,7 +452,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   font-weight: 800;
 }
 
-
 /* VERSION 1.61 Kategorien wie Tags */
 #suchKategorieKacheln .kategorie-kachel {
   background: #ffffff !important;
@@ -507,7 +468,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   border-color: #2563eb !important;
   font-weight: 700 !important;
 }
-
 
 /* VERSION 1.62 Kategorien wie Tags - neue stabile Chips */
 .rf162-kategorie-chips {
@@ -537,7 +497,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
 #suchKategorieKacheln {
   display: none !important;
 }
-
 
 /* VERSION 1.81 Einkaufsliste schöner */
 #einkaufslisteBereich,
@@ -625,7 +584,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   }
 }
 
-
 /* VERSION 1.87 Einkaufsliste echtes Kartenlayout */
 .rf187-einkaufsliste {
   display: flex;
@@ -686,7 +644,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   }
 }
 
-
 /* VERSION 1.88 Einkaufsliste sicher formatieren, ohne Inhalt zu ersetzen */
 #einkaufslisteBereich li,
 #einkaufsliste li,
@@ -746,7 +703,6 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   }
 }
 
-
 /* VERSION 1.90 Cloud Backup einklappbar */
 .rf190-cloud-toggle {
   margin-top: 10px;
@@ -760,12 +716,10 @@ body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#222}.contai
   display: none !important;
 }
 
-
 /* VERSION 1.94 Assistent wirklich schließen */
 #textImportBereich.rf194-closed {
   display: none !important;
 }
-
 
 /* VERSION 1.95 Startseite aufgeräumt */
 body.startseite-clean #ergebnisse {
@@ -784,7 +738,6 @@ body.startseite-clean .start-hinweis {
   display: block;
 }
 
-
 /* VERSION 1.96 Startseite wirklich ohne Rezeptliste */
 body.rf196-startseite #ergebnisse,
 body.rf196-startseite #rezeptSucheBereich,
@@ -794,7 +747,6 @@ body.rf196-startseite #einkaufBereich,
 body.rf196-startseite #datenpruefungBereich {
   display: none !important;
 }
-
 
 /* VERSION 1.97 Backupbereich einklappbar */
 #rf197BackupPanel {
@@ -821,7 +773,6 @@ body.rf196-startseite #datenpruefungBereich {
   margin: 4px;
 }
 
-
 /* VERSION 2.00 Backup Button sichtbar */
 #rf200BackupWrapper{
   margin-top:16px;
@@ -844,7 +795,6 @@ body.rf196-startseite #datenpruefungBereich {
   display:block;
 }
 
-
 /* VERSION 2.01 Backup-Button direkt in Startübersicht */
 #rf201BackupPanel.versteckt {
   display: none !important;
@@ -864,7 +814,6 @@ body.rf196-startseite #datenpruefungBereich {
   margin: 4px;
 }
 
-
 /* VERSION 2.02 Backup Button wirklich in der Startübersicht */
 #rf202BackupToggle {
   display: inline-block !important;
@@ -883,7 +832,6 @@ body.rf196-startseite #datenpruefungBereich {
   flex-wrap: wrap;
   gap: 10px;
 }
-
 
 /* VERSION 2.03 Backup Button bleibt in Startübersicht */
 #rf203BackupToggle {
@@ -918,7 +866,6 @@ body.rf196-startseite #datenpruefungBereich {
   font-weight: 600;
   cursor: pointer;
 }
-
 
 /* VERSION 2.04 Backup-Button exakt wie Startbuttons */
 #rf203BackupToggle,
@@ -955,7 +902,6 @@ body.rf196-startseite #datenpruefungBereich {
     width: 100% !important;
   }
 }
-
 
 /* =====================================================
    VERSION 2.05 STABILISIERUNG
@@ -1022,7 +968,6 @@ body.rf205-start #rf205BackupPanel {
   box-sizing: border-box !important;
 }
 
-
 /* VERSION 2.06 Backup wieder direkt in Übersicht */
 #rf205BackupToggle,
 #rf204BackupToggle,
@@ -1041,7 +986,6 @@ body.rf205-start #rf205BackupPanel {
   display: none !important;
 }
 
-
 /* VERSION 2.07 Startseiten-Buttons zuverlässig */
 #rf207AlleRezepte,
 #rf207RezepteSuchen,
@@ -1057,7 +1001,6 @@ body.rf205-start #rf205BackupPanel {
   align-items: center;
   justify-content: center;
 }
-
 
 /* VERSION 2.10 Rezepte prüfen wieder als Kartenansicht */
 .rf210-pruef-zusammenfassung {
@@ -1100,7 +1043,6 @@ body.rf205-start #rf205BackupPanel {
   font-size: 0.95rem;
 }
 
-
 /* VERSION 2.22 Backup-Anzeige einfach und sicher */
 #rf222BackupBox.versteckt {
   display: none !important;
@@ -1110,7 +1052,6 @@ body.rf205-start #rf205BackupPanel {
   display: block;
   margin-top: 16px;
 }
-
 
 /* VERSION 2.37 sichere Suchkarten */
 .rf237-rezeptkarte {
@@ -1133,12 +1074,10 @@ body.rf205-start #rf205BackupPanel {
   margin-top: 12px;
 }
 
-
 /* VERSION 2.41 Zutaten-Löschen Button sauber */
 .rf241-zutat-loeschen {
   margin-left: 8px;
 }
-
 
 /* VERSION 2.42 Rezept Detailansicht */
 .rf242-detailkarte {
@@ -1164,7 +1103,6 @@ body.rf205-start #rf205BackupPanel {
   gap: 8px;
   margin-top: 16px;
 }
-
 
 /* VERSION 2.43 genau ein Zutaten-Löschbutton */
 .rf243-zutat-loeschen {
@@ -1204,4 +1142,46 @@ section[hidden] {
     display: grid;
     grid-template-columns: 1fr;
   }
+}
+
+/* VERSION 2.54 Struktur- und Stabilitätslayout */
+:root {
+  --rf-primary: #2d7ff9;
+  --rf-border: #dbe3ef;
+  --rf-surface: #ffffff;
+  --rf-soft: #f8fafc;
+}
+
+.rf254-rezeptkarte {
+  background: var(--rf-surface);
+  border: 1px solid var(--rf-border);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 14px 0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.rf254-rezeptkarte h3 { margin-top: 0; }
+
+.rf254-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+[data-rf-version="2.54"] .button-gruppe,
+.button-gruppe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+[data-rf-version="2.54"] .button-gruppe button,
+.button-gruppe button { margin-right: 0; }
+
+@media (max-width: 700px) {
+  .rf254-aktionen button,
+  .button-gruppe button { width: 100%; }
 }
