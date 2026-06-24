@@ -35793,217 +35793,6 @@ window.addEventListener("load", function () {
 })();
 
 
-/* VERSION 2.57 Fix: Startseite bleibt sauber + Cloud-Backups blitzen nicht kurz auf
-   - Rezeptsuche/Alle-Rezepte-Bereich wird beim Laden nicht automatisch geöffnet.
-   - Backup-Inhalte sind standardmäßig unsichtbar und werden erst durch echten Klick geöffnet.
-   - Cloud-Backup-Funktion bleibt erhalten: beim Öffnen wird die ursprüngliche Backup-Ladefunktion genutzt. */
-(function () {
-  'use strict';
-
-  let rf257UserOpenedArea = false;
-  let rf257BackupsOpen = false;
-
-  const WORK_AREAS = [
-    'sucheBereich',
-    'rezeptSucheBereich',
-    'formularBereich',
-    'einkaufBereich',
-    'textImportBereich',
-    'datenpruefungBereich'
-  ];
-
-  const BACKUP_IDS = [
-    'cloudBackupPanel',
-    'rf222BackupBox',
-    'cloudBackupListe',
-    'cloudBackupContainer',
-    'backupListe',
-    'backupContainer',
-    'cloudBackups',
-    'backupBereich'
-  ];
-
-  function $(id) {
-    return document.getElementById(id);
-  }
-
-  function hideElement(el) {
-    if (!el) return;
-    el.hidden = true;
-    el.style.display = 'none';
-    el.classList.add('versteckt');
-    el.classList.remove('rf257-open');
-  }
-
-  function showElement(el) {
-    if (!el) return;
-    el.hidden = false;
-    el.style.display = '';
-    el.classList.remove('versteckt');
-    el.classList.add('rf257-open');
-  }
-
-  function closeBackups() {
-    BACKUP_IDS.forEach((id) => hideElement($(id)));
-    rf257BackupsOpen = false;
-    const btn = $('rf207CloudBackups');
-    if (btn) btn.textContent = 'Cloud-Backups anzeigen';
-  }
-
-  function enforceStartPage() {
-    if (rf257UserOpenedArea) return;
-
-    document.body.classList.add('rf257-startseite');
-    WORK_AREAS.forEach((id) => hideElement($(id)));
-
-    const results = $('ergebnisse');
-    if (results) {
-      results.innerHTML = '';
-      hideElement(results);
-    }
-
-    closeBackups();
-  }
-
-  function markAreaOpened() {
-    rf257UserOpenedArea = true;
-    document.body.classList.remove('rf257-startseite');
-  }
-
-  function findRealBackupLoader() {
-    const candidates = [
-      window.cloudBackupsAnzeigen_original,
-      window.zeigeCloudBackups_original,
-      window.backupsAnzeigen_original,
-      window.cloudBackupAnzeigen_original
-    ];
-
-    for (const fn of candidates) {
-      if (typeof fn === 'function' && fn !== window.rf257ToggleCloudBackups) return fn;
-    }
-
-    return null;
-  }
-
-  function moveOldBackupContentIntoPanel() {
-    const panel = $('cloudBackupPanel');
-    if (!panel) return;
-
-    const oldBoxes = BACKUP_IDS
-      .map((id) => $(id))
-      .filter((el) => el && el !== panel && el.innerHTML && el.innerHTML.trim());
-
-    const old = oldBoxes.find((el) => /backup|wiederherstellen|version/i.test(el.textContent || ''));
-    if (old) {
-      panel.innerHTML = old.innerHTML;
-      hideElement(old);
-    }
-  }
-
-  async function openBackups() {
-    markAreaOpened();
-
-    const panel = $('cloudBackupPanel');
-    if (!panel) return false;
-
-    showElement(panel);
-    rf257BackupsOpen = true;
-
-    const btn = $('rf207CloudBackups');
-    if (btn) btn.textContent = 'Cloud-Backups ausblenden';
-
-    panel.innerHTML = '<p>Cloud-Backups werden geladen ...</p>';
-
-    const loader = findRealBackupLoader();
-    if (loader) {
-      try {
-        await loader.call(window);
-      } catch (error) {
-        console.error('Cloud-Backups konnten nicht geladen werden:', error);
-        panel.innerHTML = '<p>Cloud-Backups konnten nicht geladen werden.</p>';
-      }
-
-      setTimeout(function () {
-        moveOldBackupContentIntoPanel();
-        showElement(panel);
-      }, 350);
-    } else if (typeof window.supabaseClient === 'undefined') {
-      panel.innerHTML = '<p>Cloud-Backups sind aktuell nicht verfügbar.</p>';
-    }
-
-    return false;
-  }
-
-  function toggleBackups() {
-    const panel = $('cloudBackupPanel');
-    const visible = rf257BackupsOpen || (panel && !panel.hidden && panel.style.display !== 'none' && panel.classList.contains('rf257-open'));
-
-    if (visible) {
-      closeBackups();
-      return false;
-    }
-
-    return openBackups();
-  }
-
-  function bindStartButtons() {
-    const openingIds = [
-      'rf207RezepteSuchen',
-      'rf207RezeptHinzufuegen',
-      'rf207AlleRezepte',
-      'rf207Einkaufsliste',
-      'rf207RezeptAssistent',
-      'rf207RezeptePruefen'
-    ];
-
-    openingIds.forEach((id) => {
-      const btn = $(id);
-      if (!btn || btn.dataset.rf257OpenBound === '1') return;
-      btn.dataset.rf257OpenBound = '1';
-      btn.addEventListener('click', markAreaOpened, true);
-    });
-
-    const backupButton = $('rf207CloudBackups');
-    if (backupButton && backupButton.dataset.rf257BackupBound !== '1') {
-      backupButton.dataset.rf257BackupBound = '1';
-      backupButton.type = 'button';
-      backupButton.onclick = null;
-      backupButton.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        event.stopPropagation();
-        toggleBackups();
-      }, true);
-    }
-  }
-
-  // Alte Backup-Toggle-Funktionen am Ende bewusst überschreiben.
-  window.rf257ToggleCloudBackups = toggleBackups;
-  window.rf222ToggleBackups = toggleBackups;
-  window.rf221ToggleBackups = toggleBackups;
-  window.rf220ToggleBackups = toggleBackups;
-  window.rf218ToggleBackups = toggleBackups;
-  window.cloudBackupsAnzeigen = toggleBackups;
-  window.cloudBackupAnzeigen = toggleBackups;
-  window.backupsAnzeigen = toggleBackups;
-  window.zeigeCloudBackups = toggleBackups;
-
-  // Beim ersten Render sofort schließen, dann nach alten verzögerten Fix-Blöcken erneut prüfen.
-  document.addEventListener('DOMContentLoaded', function () {
-    bindStartButtons();
-    enforceStartPage();
-  });
-
-  window.addEventListener('load', function () {
-    bindStartButtons();
-    enforceStartPage();
-    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 250);
-    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 900);
-    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 1800);
-    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 3300);
-  });
-})();
-
 /* VERSION 2.58 Fix: Zutatenzeile hat genau einen funktionierenden Entfernen-Button
    Entfernt alte Papierkorb-/Doppelbuttons und verhindert, dass alte Fix-Blöcke
    wieder zusätzliche Buttons in dynamisch erzeugte Zutatenzeilen schreiben. */
@@ -36103,14 +35892,15 @@ window.addEventListener("load", function () {
   window.rf258NormalizeIngredientDeleteButtons = normalize;
 })();
 
-/* VERSION 2.59 Fix: Startseiten-Buttons zuverlässig klickbar
-   Grund: ältere Versionsblöcke registrieren mehrere konkurrierende Click-Handler.
-   Dieser letzte Block fängt nur die Startseiten-Buttons ab und führt die passende Aktion
-   direkt aus, bevor alte Handler den Klick blockieren können. */
+/* VERSION 2.60 Stabiler Startseiten-Fix ohne globale Klick-Falle
+   - entfernt den langsamen v2.59-Document-Click-Handler
+   - bindet nur echte Startseiten-Buttons per ID
+   - keine automatisch geöffneten Unterbereiche beim Laden
+   - Cloud-Backup bleibt per eigenem Button nutzbar */
 (function () {
   'use strict';
 
-  const AREAS = [
+  const WORK_AREAS = [
     'sucheBereich',
     'rezeptSucheBereich',
     'formularBereich',
@@ -36119,8 +35909,27 @@ window.addEventListener("load", function () {
     'datenpruefungBereich'
   ];
 
-  function $(id) {
-    return document.getElementById(id);
+  const BACKUP_PANELS = [
+    'cloudBackupPanel',
+    'rf222BackupBox',
+    'cloudBackupListe',
+    'cloudBackupContainer',
+    'backupListe',
+    'backupContainer',
+    'cloudBackups',
+    'backupBereich'
+  ];
+
+  let userOpenedArea = false;
+  let backupOpen = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  function hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = 'none';
+    el.classList.add('versteckt');
   }
 
   function show(el) {
@@ -36130,176 +35939,185 @@ window.addEventListener("load", function () {
     el.classList.remove('versteckt');
   }
 
-  function hide(el) {
-    if (!el) return;
-    el.hidden = true;
-    el.style.display = 'none';
-    el.classList.add('versteckt');
+  function hideBackups() {
+    BACKUP_PANELS.forEach(id => hide($(id)));
+    backupOpen = false;
+    const btn = $('rf207CloudBackups');
+    if (btn) btn.textContent = 'Cloud-Backups anzeigen';
   }
 
-  function openOnly(areaId) {
+  function showOnly(areaId, showResults) {
+    userOpenedArea = true;
     document.body.classList.remove('rf257-startseite', 'rf205-start', 'rf196-startseite', 'startseite-clean');
-    AREAS.forEach((id) => {
-      const area = $(id);
-      if (id === areaId) show(area);
-      else hide(area);
+
+    WORK_AREAS.forEach(id => {
+      if (id === areaId) show($(id));
+      else hide($(id));
     });
 
     const results = $('ergebnisse');
     if (results) {
-      if (areaId === 'sucheBereich') show(results);
+      if (showResults) show(results);
       else hide(results);
     }
   }
 
-  function callFunction(names) {
+  function cleanStartPage() {
+    if (userOpenedArea) return;
+    WORK_AREAS.forEach(id => hide($(id)));
+    const results = $('ergebnisse');
+    if (results) {
+      results.innerHTML = '';
+      hide(results);
+    }
+    hideBackups();
+  }
+
+  function callFirst(names) {
     for (const name of names) {
       const fn = window[name];
-      if (typeof fn === 'function' && fn !== callFunction) {
-        try {
-          return fn.call(window);
-        } catch (error) {
-          console.error('Fehler beim Ausführen von', name, error);
-        }
+      if (typeof fn === 'function' && fn !== callFirst) {
+        try { return fn.call(window); }
+        catch (error) { console.warn('Fehler in ' + name, error); }
       }
     }
     return false;
   }
 
-  function refreshLists() {
-    callFunction(['rf253RefreshLists', 'tagsAktualisieren', 'quellenAktualisieren']);
+  function refreshDynamicListsSoon() {
+    setTimeout(() => callFirst(['rf253RefreshLists', 'tagsAktualisieren', 'quellenAktualisieren']), 50);
   }
 
-  function actionRecipesSearch() {
-    openOnly('rezeptSucheBereich');
-    refreshLists();
-    return false;
-  }
+  const actions = {
+    rf207RezepteSuchen(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showOnly('rezeptSucheBereich', false);
+      refreshDynamicListsSoon();
+      return false;
+    },
 
-  function actionAddRecipe() {
-    openOnly('formularBereich');
-    if (typeof window.formularLeeren === 'function') {
-      try { window.formularLeeren(); } catch (error) { console.warn(error); }
+    rf207RezeptHinzufuegen(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showOnly('formularBereich', false);
+      // Keine alten Toggle-Funktionen aufrufen. Nur Zutatenbuttons normalisieren.
+      setTimeout(() => {
+        callFirst(['rf258NormalizeIngredientDeleteButtons', 'rf256EnsureIngredientDeleteButtons']);
+      }, 80);
+      return false;
+    },
+
+    rf207AlleRezepte(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showOnly('sucheBereich', true);
+      callFirst(['rf253ShowAllRecipes', 'filterAnwenden', 'alleRezepteAnzeigen']);
+      return false;
+    },
+
+    rf207Einkaufsliste(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showOnly('einkaufBereich', false);
+      setTimeout(() => callFirst(['einkaufslisteErstellen', 'einkaufslisteAnzeigen', 'einkaufslisteRendern']), 30);
+      return false;
+    },
+
+    rf207RezeptAssistent(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showOnly('textImportBereich', false);
+      return false;
+    },
+
+    rf207RezeptePruefen(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      showOnly('datenpruefungBereich', false);
+      setTimeout(() => callFirst(['datenqualitaetPruefen', 'datenPruefen', 'rezeptePruefen']), 30);
+      return false;
+    },
+
+    rf207CloudSpeichern(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      userOpenedArea = true;
+      return callFirst(['cloudSpeichernAlle', 'cloudSpeichernAlleDirekt', 'rf252CloudUploadManualOnly']);
+    },
+
+    rf207CloudLaden(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      userOpenedArea = true;
+      return callFirst(['cloudLaden', 'cloudHerunterladen', 'ausCloudLaden', 'rf252CloudLoadMerge']);
+    },
+
+    rf207CloudBackups(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      userOpenedArea = true;
+      const panel = $('cloudBackupPanel');
+      if (!panel) return false;
+
+      if (backupOpen || (!panel.hidden && panel.style.display !== 'none')) {
+        hideBackups();
+        return false;
+      }
+
+      backupOpen = true;
+      show(panel);
+      const btn = $('rf207CloudBackups');
+      if (btn) btn.textContent = 'Cloud-Backups ausblenden';
+      panel.innerHTML = '<p>Cloud-Backups werden geladen ...</p>';
+
+      // Alte Backup-Funktionen erst nach dem Öffnen ausführen. Falls sie nicht existieren,
+      // bleibt eine klare Meldung stehen statt kurz alte Varianten anzuzeigen.
+      const result = callFirst(['cloudBackupsAnzeigen_original', 'zeigeCloudBackups_original', 'backupsAnzeigen_original', 'cloudBackupAnzeigen_original']);
+      setTimeout(() => {
+        const other = BACKUP_PANELS.map(id => $(id)).find(el => el && el !== panel && /backup|version|wiederherstellen/i.test(el.textContent || ''));
+        if (other && other.innerHTML.trim()) panel.innerHTML = other.innerHTML;
+        show(panel);
+      }, 300);
+      if (result === false) panel.innerHTML = '<p>Cloud-Backups sind aktuell nicht verfügbar.</p>';
+      return false;
+    },
+
+    rf207BackupDownload(event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      userOpenedArea = true;
+      return callFirst(['manuellesBackupHerunterladen', 'backupHerunterladen', 'backupExportieren', 'datenExportieren']);
     }
-    if (typeof window.rf258NormalizeIngredientDeleteButtons === 'function') {
-      setTimeout(window.rf258NormalizeIngredientDeleteButtons, 50);
-    }
-    return false;
-  }
-
-  function actionAllRecipes() {
-    openOnly('sucheBereich');
-    if (typeof window.rf253ShowAllRecipes === 'function') return window.rf253ShowAllRecipes();
-    if (typeof window.filterAnwenden === 'function') return window.filterAnwenden();
-    return false;
-  }
-
-  function actionShoppingList() {
-    openOnly('einkaufBereich');
-    callFunction(['einkaufslisteErstellen', 'einkaufslisteAnzeigen', 'einkaufslisteRendern']);
-    return false;
-  }
-
-  function actionAssistant() {
-    openOnly('textImportBereich');
-    return false;
-  }
-
-  function actionCheckRecipes() {
-    openOnly('datenpruefungBereich');
-    callFunction(['datenqualitaetPruefen', 'datenPruefen', 'rezeptePruefen']);
-    return false;
-  }
-
-  function actionCloudSave() {
-    return callFunction(['cloudSpeichernAlle', 'cloudSpeichernAlleDirekt', 'rf252CloudUploadManualOnly']);
-  }
-
-  function actionCloudLoad() {
-    return callFunction(['cloudLaden', 'cloudHerunterladen', 'ausCloudLaden', 'rf252CloudLoadMerge']);
-  }
-
-  function actionCloudBackups() {
-    if (typeof window.rf257ToggleCloudBackups === 'function') return window.rf257ToggleCloudBackups();
-    return callFunction(['cloudBackupsAnzeigen', 'cloudBackupAnzeigen', 'backupsAnzeigen', 'zeigeCloudBackups']);
-  }
-
-  function actionBackupDownload() {
-    return callFunction(['manuellesBackupHerunterladen', 'backupHerunterladen', 'backupExportieren', 'datenExportieren']);
-  }
-
-  const ACTIONS_BY_ID = {
-    rf207RezepteSuchen: actionRecipesSearch,
-    rf207RezeptHinzufuegen: actionAddRecipe,
-    rf207AlleRezepte: actionAllRecipes,
-    rf207Einkaufsliste: actionShoppingList,
-    rf207RezeptAssistent: actionAssistant,
-    rf207RezeptePruefen: actionCheckRecipes,
-    rf207CloudSpeichern: actionCloudSave,
-    rf207CloudLaden: actionCloudLoad,
-    rf207CloudBackups: actionCloudBackups,
-    rf207BackupDownload: actionBackupDownload
   };
 
-  const ACTIONS_BY_TEXT = {
-    'rezepte suchen': actionRecipesSearch,
-    'rezept hinzufügen': actionAddRecipe,
-    'rezept hinzufuegen': actionAddRecipe,
-    'alle rezepte anzeigen': actionAllRecipes,
-    'einkaufsliste': actionShoppingList,
-    'rezept-assistent': actionAssistant,
-    'rezepte prüfen': actionCheckRecipes,
-    'rezepte pruefen': actionCheckRecipes,
-    'jetzt in cloud speichern': actionCloudSave,
-    'aus cloud laden': actionCloudLoad,
-    'cloud-backups anzeigen': actionCloudBackups,
-    'cloud-backups ausblenden': actionCloudBackups,
-    'manuelles backup herunterladen': actionBackupDownload
-  };
-
-  function getAction(button) {
-    if (!button) return null;
-    if (button.id && ACTIONS_BY_ID[button.id]) return ACTIONS_BY_ID[button.id];
-    const text = String(button.textContent || '').trim().toLowerCase();
-    return ACTIONS_BY_TEXT[text] || null;
-  }
-
-  function bindDirectly() {
-    Object.keys(ACTIONS_BY_ID).forEach((id) => {
-      const button = $(id);
-      if (!button) return;
-      button.type = 'button';
-      button.disabled = false;
-      button.removeAttribute('disabled');
-      button.onclick = null;
-      button.dataset.rf259StartButton = '1';
+  function bindButtons() {
+    Object.keys(actions).forEach(id => {
+      const btn = $(id);
+      if (!btn || btn.dataset.rf260Bound === '1') return;
+      btn.dataset.rf260Bound = '1';
+      btn.type = 'button';
+      btn.disabled = false;
+      btn.removeAttribute('disabled');
+      btn.onclick = null;
+      btn.addEventListener('click', actions[id], true);
     });
   }
 
-  document.addEventListener('click', function (event) {
-    const button = event.target && event.target.closest ? event.target.closest('button') : null;
-    const action = getAction(button);
-    if (!action) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    event.stopPropagation();
-    action();
-  }, true);
-
-  document.addEventListener('DOMContentLoaded', bindDirectly);
-  window.addEventListener('load', function () {
-    bindDirectly();
-    setTimeout(bindDirectly, 250);
-    setTimeout(bindDirectly, 900);
-    setTimeout(bindDirectly, 1800);
+  document.addEventListener('DOMContentLoaded', function () {
+    bindButtons();
+    cleanStartPage();
   });
 
-  window.rf259StartButtonsDiagnose = function () {
-    const result = {};
-    Object.keys(ACTIONS_BY_ID).forEach((id) => {
-      result[id] = !!$(id);
-    });
-    return result;
+  window.addEventListener('load', function () {
+    bindButtons();
+    cleanStartPage();
+    setTimeout(bindButtons, 250);
+  });
+
+  window.rf260Diagnose = function () {
+    const found = {};
+    Object.keys(actions).forEach(id => { found[id] = !!$(id); });
+    return { version: '2.60', buttons: found, userOpenedArea, backupOpen };
   };
 })();
