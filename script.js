@@ -35726,61 +35726,118 @@ window.addEventListener("load", function () {
 })();
 
 // =====================================================
-// VERSION 2.67 - Nur Papierkorb-Buttons entfernen/ausblenden
-// Ziel: Startseite unverändert lassen. Der sichtbare Button "Entfernen"
-// bleibt bestehen und löscht die jeweilige Zutatenzeile.
+// VERSION 2.68 - Nur Zutatenzeilen-Buttons bereinigen
+// Ziel: Startseite unverändert lassen. In jeder Zutatenzeile bleibt
+// nur ein Button "Entfernen". Alte X-/Papierkorb-Buttons werden entfernt.
 // =====================================================
-(function(){
-  function removeOldTrashButtons(){
-    var container=document.getElementById("zutatenGruppen");
-    if(!container) return;
-    container.querySelectorAll(".rf239-zutat-loeschen,.rf241-zutat-loeschen,.rf243-zutat-loeschen").forEach(function(btn){
-      btn.remove();
+(function () {
+  function text(btn) {
+    return String(btn && btn.textContent || "").trim().toLowerCase();
+  }
+
+  function isRemoveLabel(btn) {
+    const t = text(btn);
+    return t === "entfernen" || t === "x" || t === "×" || t === "🗑" || t === "🚮" || t.includes("löschen") || t.includes("loeschen");
+  }
+
+  function bindRemoveButton(btn, row) {
+    btn.type = "button";
+    btn.textContent = "Entfernen";
+    btn.className = "rf268-zutat-entfernen";
+    btn.title = "Diese Zutatenzeile entfernen";
+    btn.onclick = function (event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      const zeile = btn.closest(".zutaten-zeile, .zutat-zeile");
+      if (zeile) zeile.remove();
+      return false;
+    };
+    if (row && btn.parentElement !== row) row.appendChild(btn);
+  }
+
+  function createRemoveButton(row) {
+    const btn = document.createElement("button");
+    bindRemoveButton(btn, row);
+    return btn;
+  }
+
+  function normalizeIngredientRows268() {
+    const container = document.getElementById("zutatenGruppen");
+    if (!container) return;
+
+    // Alte Buttons, die direkt in der Zeilenliste landen, gehören zu keiner Zutat und werden entfernt.
+    container.querySelectorAll(".zutaten-zeilen > button, .zutaten-liste > button, .zutaten-container > button").forEach(function (btn) {
+      const t = text(btn);
+      if (t !== "zutat hinzufügen" && t !== "zutat hinzufuegen") btn.remove();
     });
-    container.querySelectorAll(".zutaten-zeile,.zutat-zeile").forEach(function(row){
-      // Falls eine alte Version wieder einen reinen Papierkorb-Button ohne Klasse erzeugt.
-      Array.from(row.querySelectorAll("button")).forEach(function(btn){
-        var text=String(btn.textContent||"").trim();
-        var title=String(btn.title||"").toLowerCase();
-        if(text==="🗑" || title==="zutat löschen" || title==="zutat loeschen") btn.remove();
+
+    container.querySelectorAll(".zutaten-zeile, .zutat-zeile").forEach(function (row) {
+      const buttons = Array.from(row.querySelectorAll("button"));
+      let keep = buttons.find(function (btn) { return text(btn) === "entfernen"; }) ||
+                 buttons.find(isRemoveLabel) ||
+                 null;
+
+      buttons.forEach(function (btn) {
+        if (btn !== keep) btn.remove();
       });
-      var entfernen=Array.from(row.querySelectorAll("button")).filter(function(btn){
-        return String(btn.textContent||"").trim().toLowerCase()==="entfernen";
-      });
-      if(entfernen.length>1){
-        entfernen.slice(1).forEach(function(btn){btn.remove();});
-      }
-      if(entfernen[0]){
-        entfernen[0].type="button";
-        entfernen[0].classList.add("rf267-zutat-entfernen");
-        entfernen[0].onclick=function(event){
-          if(event){event.preventDefault(); event.stopPropagation();}
-          var zeile=this.closest(".zutaten-zeile,.zutat-zeile");
-          if(zeile) zeile.remove();
-          return false;
-        };
-      }
+
+      if (!keep || !keep.isConnected) keep = createRemoveButton(row);
+      bindRemoveButton(keep, row);
+      row.appendChild(keep);
     });
   }
 
-  var pending=false;
-  function schedule(){
-    if(pending) return;
-    pending=true;
-    setTimeout(function(){pending=false; removeOldTrashButtons();},50);
+  let pending = false;
+  function scheduleNormalize268() {
+    if (pending) return;
+    pending = true;
+    window.setTimeout(function () {
+      pending = false;
+      normalizeIngredientRows268();
+    }, 30);
   }
 
-  function start(){
-    removeOldTrashButtons();
-    var container=document.getElementById("zutatenGruppen");
-    if(container && container.dataset.rf267Observer!=="1"){
-      container.dataset.rf267Observer="1";
-      new MutationObserver(schedule).observe(container,{childList:true,subtree:true});
+  // Nur Zutaten-Entfernen-Buttons behandeln, keine Startseiten-Buttons.
+  document.addEventListener("click", function (event) {
+    const btn = event.target && event.target.closest ? event.target.closest("#zutatenGruppen .zutaten-zeile button, #zutatenGruppen .zutat-zeile button") : null;
+    if (!btn) return;
+    if (!isRemoveLabel(btn) && !btn.classList.contains("rf268-zutat-entfernen")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const row = btn.closest(".zutaten-zeile, .zutat-zeile");
+    if (row) row.remove();
+  }, false);
+
+  const oldAdd = window.zutatenZeileHinzufuegen;
+  if (typeof oldAdd === "function" && !oldAdd.__rf268Wrapped) {
+    const wrapped = function () {
+      const result = oldAdd.apply(this, arguments);
+      scheduleNormalize268();
+      return result;
+    };
+    wrapped.__rf268Wrapped = true;
+    window.zutatenZeileHinzufuegen = wrapped;
+    try { zutatenZeileHinzufuegen = wrapped; } catch (e) {}
+  }
+
+  function start268() {
+    normalizeIngredientRows268();
+    const container = document.getElementById("zutatenGruppen");
+    if (container && container.dataset.rf268Observer !== "1") {
+      container.dataset.rf268Observer = "1";
+      new MutationObserver(scheduleNormalize268).observe(container, { childList: true, subtree: true });
     }
   }
 
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start);
-  else start();
-  window.addEventListener("load",function(){start(); setTimeout(removeOldTrashButtons,300); setTimeout(removeOldTrashButtons,1000);});
-  window.rf267RemoveOldTrashButtons=removeOldTrashButtons;
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start268);
+  else start268();
+  window.addEventListener("load", function () {
+    start268();
+    window.setTimeout(normalizeIngredientRows268, 250);
+    window.setTimeout(normalizeIngredientRows268, 1000);
+  });
+
+  window.rf268NormalizeIngredientRows = normalizeIngredientRows268;
 })();
