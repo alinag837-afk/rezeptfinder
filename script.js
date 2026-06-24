@@ -35862,3 +35862,291 @@ window.addEventListener("load", function () {
 
   window.rf271ZeigeStartseite = zeigeStartseite;
 })();
+
+/* =====================================================
+   VERSION 2.72 Bearbeiten ersetzt vorhandenes Rezept
+   - Beim Bearbeiten wird die Rezept-ID gemerkt.
+   - Speichern ersetzt dieses Rezept statt ein neues anzulegen.
+   - Startseite und andere Buttons werden nicht neu gebunden.
+   ===================================================== */
+(function rf272BearbeitenErsetztRezept() {
+  const KEY = 'rezepte';
+  const SAFE_KEY = 'rezepte_rf235_sicherung';
+  const EDIT_ID_KEY = 'rf272_edit_id';
+  const EDIT_INDEX_KEY = 'rf272_edit_index';
+
+  function $(id) { return document.getElementById(id); }
+
+  function makeId() {
+    try {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch (error) {}
+    return 'rezept_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+  }
+
+  function loadRecipes() {
+    try {
+      const data = JSON.parse(localStorage.getItem(KEY) || '[]');
+      return Array.isArray(data) ? data.filter(Boolean) : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveRecipes(list) {
+    const cleaned = Array.isArray(list) ? list.filter(Boolean) : [];
+    cleaned.forEach(function (recipe) {
+      if (recipe && !recipe.id) recipe.id = makeId();
+    });
+
+    const json = JSON.stringify(cleaned);
+    localStorage.setItem(KEY, json);
+    localStorage.setItem(SAFE_KEY, json);
+    window.rezepte = cleaned;
+    try { rezepte = cleaned; } catch (error) {}
+  }
+
+  function rememberEdit(index) {
+    const list = loadRecipes();
+    const i = Number(index);
+    if (!Number.isInteger(i) || i < 0 || i >= list.length || !list[i]) return false;
+
+    if (!list[i].id) {
+      list[i].id = makeId();
+      saveRecipes(list);
+    }
+
+    sessionStorage.setItem(EDIT_ID_KEY, String(list[i].id));
+    sessionStorage.setItem(EDIT_INDEX_KEY, String(i));
+    window.bearbeitungsIndex = i;
+    try { bearbeitungsIndex = i; } catch (error) {}
+    return true;
+  }
+
+  function currentEdit() {
+    const id = sessionStorage.getItem(EDIT_ID_KEY) || '';
+    const storedIndex = sessionStorage.getItem(EDIT_INDEX_KEY);
+    let index = storedIndex !== null && storedIndex !== '' ? Number(storedIndex) : null;
+
+    if (!Number.isInteger(index)) {
+      try {
+        if (Number.isInteger(bearbeitungsIndex)) index = bearbeitungsIndex;
+      } catch (error) {}
+    }
+    if (!Number.isInteger(index) && Number.isInteger(window.bearbeitungsIndex)) index = window.bearbeitungsIndex;
+
+    return { id, index: Number.isInteger(index) ? index : null };
+  }
+
+  function clearEdit() {
+    sessionStorage.removeItem(EDIT_ID_KEY);
+    sessionStorage.removeItem(EDIT_INDEX_KEY);
+    window.bearbeitungsIndex = null;
+    try { bearbeitungsIndex = null; } catch (error) {}
+  }
+
+  function val(id) {
+    const el = $(id);
+    return el && typeof el.value !== 'undefined' ? String(el.value).trim() : '';
+  }
+
+  function readIngredients() {
+    const container = $('zutatenGruppen');
+    const groups = [];
+    if (!container) return { groups: [], flat: [] };
+
+    const groupEls = Array.from(container.querySelectorAll('.zutatengruppe'));
+    const relevantGroups = groupEls.length ? groupEls : [container];
+
+    relevantGroups.forEach(function (groupEl, groupIndex) {
+      const groupName = groupEl.querySelector('.zutaten-gruppenname')?.value?.trim() || (groupIndex === 0 ? 'Zutaten' : 'Gruppe ' + (groupIndex + 1));
+      const rows = Array.from(groupEl.querySelectorAll('.zutaten-zeile, .zutat-zeile'));
+      const zutaten = [];
+
+      rows.forEach(function (row) {
+        const menge = row.querySelector('.zutat-menge')?.value?.trim() || '';
+        const einheit = row.querySelector('.zutat-einheit')?.value?.trim() || '';
+        const name = row.querySelector('.zutat-name')?.value?.trim() || '';
+        if (menge || einheit || name) zutaten.push({ menge, einheit, name });
+      });
+
+      if (zutaten.length) groups.push({ name: groupName, zutaten });
+    });
+
+    return { groups, flat: groups.flatMap(function (group) { return group.zutaten || []; }) };
+  }
+
+  function recipeFromForm(existing, id) {
+    const ingredients = readIngredients();
+    const tags = val('tagsInput').split(',').map(function (tag) { return tag.trim().toLowerCase(); }).filter(Boolean);
+    const utensils = val('utensilienInput').split(',').map(function (item) { return item.trim(); }).filter(Boolean);
+    const aus = $('ausprobiertInput');
+
+    return {
+      id: id || existing?.id || makeId(),
+      name: val('nameInput'),
+      kategorie: val('kategorieInput') || 'Nicht zugeordnet',
+      portionen: val('portionenInput'),
+      schwierigkeit: val('schwierigkeitInput'),
+      zubereitungszeit: val('zubereitungszeitInput'),
+      quelle: val('quelleInput'),
+      tags,
+      zubereitung: val('zubereitungInput'),
+      utensilien: utensils,
+      notizen: val('notizenInput'),
+      naehrwerte: {
+        kalorien: val('kalorienInput'),
+        eiweiss: val('eiweissInput'),
+        kohlenhydrate: val('kohlenhydrateInput'),
+        fett: val('fettInput'),
+        zucker: val('zuckerInput'),
+        ballaststoffe: val('ballaststoffeInput'),
+        salz: val('salzInput')
+      },
+      zutatenGruppen: ingredients.groups,
+      zutaten: ingredients.flat,
+      ausprobiert: aus ? String(aus.value).toLowerCase() === 'true' : !!existing?.ausprobiert,
+      favorit: !!existing?.favorit,
+      bewertung: Number(existing?.bewertung || 0),
+      erstelltAm: existing?.erstelltAm || new Date().toISOString(),
+      aktualisiertAm: new Date().toISOString()
+    };
+  }
+
+  function showMessage(text, isError) {
+    if (typeof window.meldungAnzeigen === 'function') {
+      window.meldungAnzeigen(text, !!isError);
+      return;
+    }
+    alert(text);
+  }
+
+  function goHome() {
+    if (typeof window.rf271ZeigeStartseite === 'function') {
+      window.rf271ZeigeStartseite();
+      return;
+    }
+    ['sucheBereich', 'formularBereich', 'einkaufBereich', 'rezeptSucheBereich', 'textImportBereich', 'datenpruefungBereich'].forEach(function (id) {
+      const el = $(id);
+      if (el) el.classList.add('versteckt');
+    });
+    const out = $('ergebnisse');
+    if (out) out.innerHTML = '';
+  }
+
+  function saveEditedOrNewRecipe(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+
+    const list = loadRecipes();
+    const edit = currentEdit();
+    let replaceIndex = -1;
+
+    if (edit.id) {
+      replaceIndex = list.findIndex(function (recipe) {
+        return recipe && String(recipe.id || '') === String(edit.id);
+      });
+    }
+
+    if (replaceIndex < 0 && edit.index !== null && list[edit.index]) {
+      replaceIndex = edit.index;
+    }
+
+    const isEdit = replaceIndex >= 0;
+    const existing = isEdit ? list[replaceIndex] : null;
+    const idToUse = edit.id || existing?.id || makeId();
+    const recipe = recipeFromForm(existing, idToUse);
+
+    if (!recipe.name) {
+      showMessage('Bitte einen Rezeptnamen eingeben.', true);
+      return false;
+    }
+    if (!recipe.zutaten.length) {
+      showMessage('Bitte mindestens eine Zutat eingeben.', true);
+      return false;
+    }
+    if (!recipe.zubereitung) {
+      showMessage('Bitte eine Zubereitung eingeben.', true);
+      return false;
+    }
+
+    if (isEdit) {
+      list[replaceIndex] = recipe;
+    } else {
+      list.push(recipe);
+    }
+
+    // Falls eine alte Speicherlogik zuvor schon ein Duplikat mit derselben ID erzeugt hat,
+    // bleibt nur die zuletzt gespeicherte Fassung dieses Rezepts erhalten.
+    const result = [];
+    list.forEach(function (item) {
+      if (!item) return;
+      if (String(item.id || '') === String(recipe.id)) return;
+      result.push(item);
+    });
+    result.splice(isEdit && replaceIndex <= result.length ? replaceIndex : result.length, 0, recipe);
+
+    saveRecipes(result);
+    clearEdit();
+
+    try { if (typeof window.dashboardAktualisieren === 'function') window.dashboardAktualisieren(); } catch (error) {}
+    try { if (typeof window.rf250RefreshTags === 'function') window.rf250RefreshTags(); } catch (error) {}
+    try { if (typeof window.rf253RefreshLists === 'function') window.rf253RefreshLists(); } catch (error) {}
+
+    showMessage(isEdit ? 'Rezept aktualisiert.' : 'Rezept gespeichert.');
+    goHome();
+    return false;
+  }
+
+  const previousEdit = window.rezeptBearbeiten;
+  window.rezeptBearbeiten = function (index) {
+    rememberEdit(index);
+    if (typeof previousEdit === 'function' && previousEdit !== window.rezeptBearbeiten) {
+      return previousEdit.apply(this, arguments);
+    }
+    return false;
+  };
+  try { rezeptBearbeiten = window.rezeptBearbeiten; } catch (error) {}
+
+  window.rezeptSpeichern = saveEditedOrNewRecipe;
+  window.rezeptSpeichernDirektCloud = saveEditedOrNewRecipe;
+  window.rf155RezeptSpeichern = saveEditedOrNewRecipe;
+  window.rf272RezeptSpeichern = saveEditedOrNewRecipe;
+  try {
+    rezeptSpeichern = saveEditedOrNewRecipe;
+    rezeptSpeichernDirektCloud = saveEditedOrNewRecipe;
+    rf155RezeptSpeichern = saveEditedOrNewRecipe;
+  } catch (error) {}
+
+  document.addEventListener('click', function (event) {
+    const button = event.target && event.target.closest ? event.target.closest('button') : null;
+    if (!button) return;
+
+    const onclick = button.getAttribute('onclick') || '';
+    const editMatch = onclick.match(/rezeptBearbeiten\((\d+)\)/) || onclick.match(/rf\d+RezeptBearbeiten[^0-9]*(\d+)/);
+    if (editMatch) rememberEdit(Number(editMatch[1]));
+
+    if (button.id === 'rf235SaveButton') {
+      return saveEditedOrNewRecipe(event);
+    }
+  }, true);
+
+  function bindSaveButton() {
+    const button = $('rf235SaveButton');
+    if (!button || button.__rf272Bound) return;
+    button.__rf272Bound = true;
+    button.type = 'button';
+    button.removeAttribute('onclick');
+    button.addEventListener('click', saveEditedOrNewRecipe, true);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindSaveButton);
+  } else {
+    bindSaveButton();
+  }
+  window.addEventListener('load', bindSaveButton);
+})();
