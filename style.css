@@ -1189,3 +1189,36 @@ section[hidden] {
 
 /* VERSION 2.55 kleine Fix-Markierung: Einkaufsliste Reset stabilisiert */
 .einkauf-leer{color:#475569;font-weight:600;}
+
+
+/* VERSION 2.57 Startseite/Cloud-Backup stabil */
+body.rf257-startseite #sucheBereich,
+body.rf257-startseite #rezeptSucheBereich,
+body.rf257-startseite #formularBereich,
+body.rf257-startseite #einkaufBereich,
+body.rf257-startseite #textImportBereich,
+body.rf257-startseite #datenpruefungBereich,
+body.rf257-startseite #ergebnisse {
+  display: none !important;
+}
+
+/* Alte oder gerade ladende Backup-Ausgaben dürfen beim Seitenstart nicht kurz aufblitzen. */
+#cloudBackupPanel,
+#rf222BackupBox,
+#cloudBackupListe,
+#cloudBackupContainer,
+#backupListe,
+#backupContainer,
+#cloudBackups,
+#backupBereich {
+  display: none !important;
+}
+
+#cloudBackupPanel.rf257-open,
+#rf222BackupBox.rf257-open {
+  display: block !important;
+}
+
+#cloudBackupPanel.rf257-open {
+  margin-top: 12px;
+}

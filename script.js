@@ -35791,3 +35791,215 @@ window.addEventListener("load", function () {
     setTimeout(run, 3200);
   });
 })();
+
+
+/* VERSION 2.57 Fix: Startseite bleibt sauber + Cloud-Backups blitzen nicht kurz auf
+   - Rezeptsuche/Alle-Rezepte-Bereich wird beim Laden nicht automatisch geöffnet.
+   - Backup-Inhalte sind standardmäßig unsichtbar und werden erst durch echten Klick geöffnet.
+   - Cloud-Backup-Funktion bleibt erhalten: beim Öffnen wird die ursprüngliche Backup-Ladefunktion genutzt. */
+(function () {
+  'use strict';
+
+  let rf257UserOpenedArea = false;
+  let rf257BackupsOpen = false;
+
+  const WORK_AREAS = [
+    'sucheBereich',
+    'rezeptSucheBereich',
+    'formularBereich',
+    'einkaufBereich',
+    'textImportBereich',
+    'datenpruefungBereich'
+  ];
+
+  const BACKUP_IDS = [
+    'cloudBackupPanel',
+    'rf222BackupBox',
+    'cloudBackupListe',
+    'cloudBackupContainer',
+    'backupListe',
+    'backupContainer',
+    'cloudBackups',
+    'backupBereich'
+  ];
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function hideElement(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = 'none';
+    el.classList.add('versteckt');
+    el.classList.remove('rf257-open');
+  }
+
+  function showElement(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = '';
+    el.classList.remove('versteckt');
+    el.classList.add('rf257-open');
+  }
+
+  function closeBackups() {
+    BACKUP_IDS.forEach((id) => hideElement($(id)));
+    rf257BackupsOpen = false;
+    const btn = $('rf207CloudBackups');
+    if (btn) btn.textContent = 'Cloud-Backups anzeigen';
+  }
+
+  function enforceStartPage() {
+    if (rf257UserOpenedArea) return;
+
+    document.body.classList.add('rf257-startseite');
+    WORK_AREAS.forEach((id) => hideElement($(id)));
+
+    const results = $('ergebnisse');
+    if (results) {
+      results.innerHTML = '';
+      hideElement(results);
+    }
+
+    closeBackups();
+  }
+
+  function markAreaOpened() {
+    rf257UserOpenedArea = true;
+    document.body.classList.remove('rf257-startseite');
+  }
+
+  function findRealBackupLoader() {
+    const candidates = [
+      window.cloudBackupsAnzeigen_original,
+      window.zeigeCloudBackups_original,
+      window.backupsAnzeigen_original,
+      window.cloudBackupAnzeigen_original
+    ];
+
+    for (const fn of candidates) {
+      if (typeof fn === 'function' && fn !== window.rf257ToggleCloudBackups) return fn;
+    }
+
+    return null;
+  }
+
+  function moveOldBackupContentIntoPanel() {
+    const panel = $('cloudBackupPanel');
+    if (!panel) return;
+
+    const oldBoxes = BACKUP_IDS
+      .map((id) => $(id))
+      .filter((el) => el && el !== panel && el.innerHTML && el.innerHTML.trim());
+
+    const old = oldBoxes.find((el) => /backup|wiederherstellen|version/i.test(el.textContent || ''));
+    if (old) {
+      panel.innerHTML = old.innerHTML;
+      hideElement(old);
+    }
+  }
+
+  async function openBackups() {
+    markAreaOpened();
+
+    const panel = $('cloudBackupPanel');
+    if (!panel) return false;
+
+    showElement(panel);
+    rf257BackupsOpen = true;
+
+    const btn = $('rf207CloudBackups');
+    if (btn) btn.textContent = 'Cloud-Backups ausblenden';
+
+    panel.innerHTML = '<p>Cloud-Backups werden geladen ...</p>';
+
+    const loader = findRealBackupLoader();
+    if (loader) {
+      try {
+        await loader.call(window);
+      } catch (error) {
+        console.error('Cloud-Backups konnten nicht geladen werden:', error);
+        panel.innerHTML = '<p>Cloud-Backups konnten nicht geladen werden.</p>';
+      }
+
+      setTimeout(function () {
+        moveOldBackupContentIntoPanel();
+        showElement(panel);
+      }, 350);
+    } else if (typeof window.supabaseClient === 'undefined') {
+      panel.innerHTML = '<p>Cloud-Backups sind aktuell nicht verfügbar.</p>';
+    }
+
+    return false;
+  }
+
+  function toggleBackups() {
+    const panel = $('cloudBackupPanel');
+    const visible = rf257BackupsOpen || (panel && !panel.hidden && panel.style.display !== 'none' && panel.classList.contains('rf257-open'));
+
+    if (visible) {
+      closeBackups();
+      return false;
+    }
+
+    return openBackups();
+  }
+
+  function bindStartButtons() {
+    const openingIds = [
+      'rf207RezepteSuchen',
+      'rf207RezeptHinzufuegen',
+      'rf207AlleRezepte',
+      'rf207Einkaufsliste',
+      'rf207RezeptAssistent',
+      'rf207RezeptePruefen'
+    ];
+
+    openingIds.forEach((id) => {
+      const btn = $(id);
+      if (!btn || btn.dataset.rf257OpenBound === '1') return;
+      btn.dataset.rf257OpenBound = '1';
+      btn.addEventListener('click', markAreaOpened, true);
+    });
+
+    const backupButton = $('rf207CloudBackups');
+    if (backupButton && backupButton.dataset.rf257BackupBound !== '1') {
+      backupButton.dataset.rf257BackupBound = '1';
+      backupButton.type = 'button';
+      backupButton.onclick = null;
+      backupButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        event.stopPropagation();
+        toggleBackups();
+      }, true);
+    }
+  }
+
+  // Alte Backup-Toggle-Funktionen am Ende bewusst überschreiben.
+  window.rf257ToggleCloudBackups = toggleBackups;
+  window.rf222ToggleBackups = toggleBackups;
+  window.rf221ToggleBackups = toggleBackups;
+  window.rf220ToggleBackups = toggleBackups;
+  window.rf218ToggleBackups = toggleBackups;
+  window.cloudBackupsAnzeigen = toggleBackups;
+  window.cloudBackupAnzeigen = toggleBackups;
+  window.backupsAnzeigen = toggleBackups;
+  window.zeigeCloudBackups = toggleBackups;
+
+  // Beim ersten Render sofort schließen, dann nach alten verzögerten Fix-Blöcken erneut prüfen.
+  document.addEventListener('DOMContentLoaded', function () {
+    bindStartButtons();
+    enforceStartPage();
+  });
+
+  window.addEventListener('load', function () {
+    bindStartButtons();
+    enforceStartPage();
+    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 250);
+    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 900);
+    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 1800);
+    setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 3300);
+  });
+})();
