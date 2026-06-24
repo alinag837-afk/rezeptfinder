@@ -1213,3 +1213,13 @@ section[hidden] {
   color: #ffffff;
   white-space: nowrap;
 }
+
+
+/* VERSION 2.64 Zutatenzeilen: genau ein stabiler Entfernen-Button */
+.zutaten-zeile button,
+.rf264-zutat-entfernen {
+  margin-top: 0 !important;
+  background: #b00020 !important;
+  color: #ffffff !important;
+  white-space: nowrap;
+}

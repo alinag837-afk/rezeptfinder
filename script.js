@@ -35820,3 +35820,204 @@ window.addEventListener("load", function () {
     bereinigeVorhandeneZeilen();
   });
 })();
+
+
+/* =====================================================
+   VERSION 2.64 - stabiler Zutaten-Löschbutton + Version
+   Ziel: Jede Zutatenzeile hat genau einen Entfernen-Button.
+   Der Button löscht immer seine eigene Zeile, auch wenn ältere
+   onclick-Handler oder alte Versionsblöcke noch im Code vorhanden sind.
+   ===================================================== */
+(function () {
+  "use strict";
+
+  function esc264(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function norm264(value) {
+    return String(value || "")
+      .toLowerCase()
+      .trim()
+      .replaceAll("ä", "ae")
+      .replaceAll("ö", "oe")
+      .replaceAll("ü", "ue")
+      .replaceAll("ß", "ss")
+      .replaceAll(".", "");
+  }
+
+  function einheiten264() {
+    return Array.isArray(window.EINHEITEN) && window.EINHEITEN.length
+      ? window.EINHEITEN
+      : ["", "g", "dag", "kg", "ml", "cl", "dl", "l", "TL", "EL", "Stk.", "Prise", "Päckchen", "Dose", "Glas", "Bund", "Zweig", "Blatt", "Scheibe"];
+  }
+
+  function zutatAnalysieren264(zutat) {
+    if (typeof window.zutatAnalysieren === "function") {
+      try { return window.zutatAnalysieren(zutat); } catch (error) {}
+    }
+    if (zutat && typeof zutat === "object") {
+      return {
+        originalMenge: zutat.menge || "",
+        originalEinheit: zutat.einheit || "",
+        einheit: zutat.einheit || "",
+        name: zutat.name || ""
+      };
+    }
+    return { originalMenge: "", originalEinheit: "", einheit: "", name: String(zutat || "") };
+  }
+
+  function entferneZutatenZeile264(button) {
+    const zeile = button && button.closest ? button.closest(".zutaten-zeile") : null;
+    if (!zeile) return false;
+    zeile.remove();
+    return true;
+  }
+
+  function normalisiereZutatenZeile264(zeile) {
+    if (!zeile) return;
+
+    const buttons = Array.from(zeile.querySelectorAll("button"));
+    let button = buttons.find(b => b.classList.contains("rf264-zutat-entfernen")) || buttons[0];
+
+    buttons.forEach(b => {
+      if (b !== button) b.remove();
+    });
+
+    if (!button) {
+      button = document.createElement("button");
+      zeile.appendChild(button);
+    }
+
+    button.type = "button";
+    button.className = "rf264-zutat-entfernen";
+    button.textContent = "Entfernen";
+    button.removeAttribute("onclick");
+    button.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      entferneZutatenZeile264(button);
+      return false;
+    };
+  }
+
+  function normalisiereAlleZutatenZeilen264() {
+    document.querySelectorAll(".zutaten-zeile").forEach(normalisiereZutatenZeile264);
+  }
+
+  function zutatenZeileHinzufuegen264(bereich, menge = "", einheit = "", name = "") {
+    const ziel = bereich || document.querySelector(".zutaten-zeilen");
+    if (!ziel) return null;
+
+    const div = document.createElement("div");
+    div.className = "zutaten-zeile";
+
+    const optionen = einheiten264().map(e => {
+      const selected = norm264(e) === norm264(einheit) ? " selected" : "";
+      return `<option value="${esc264(e)}"${selected}>${esc264(e || "Einheit")}</option>`;
+    }).join("");
+
+    div.innerHTML = `
+      <input class="zutat-menge" placeholder="Menge" value="${esc264(menge)}">
+      <select class="zutat-einheit">${optionen}</select>
+      <input class="zutat-name" placeholder="Zutat" value="${esc264(name)}">
+      <button type="button" class="rf264-zutat-entfernen">Entfernen</button>
+    `;
+
+    ziel.appendChild(div);
+    normalisiereZutatenZeile264(div);
+    return div;
+  }
+
+  function zutatenGruppeHinzufuegen264(name = "Zutaten", zutaten = []) {
+    const container = document.getElementById("zutatenGruppen");
+    if (!container) return null;
+
+    const box = document.createElement("div");
+    box.className = "zutatengruppe";
+    box.innerHTML = `
+      <div class="zutatengruppe-kopf">
+        <input class="zutaten-gruppenname" placeholder="Gruppe, z. B. Teig, Fülle, Glasur" value="${esc264(name)}">
+        <button type="button" class="rf264-gruppe-entfernen">Gruppe löschen</button>
+      </div>
+      <div class="zutaten-zeilen"></div>
+      <button type="button" class="rf264-zutat-hinzufuegen">Zutat hinzufügen</button>
+    `;
+
+    container.appendChild(box);
+
+    const gruppeButton = box.querySelector(".rf264-gruppe-entfernen");
+    gruppeButton.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      box.remove();
+      return false;
+    };
+
+    const ziel = box.querySelector(".zutaten-zeilen");
+    const addButton = box.querySelector(".rf264-zutat-hinzufuegen");
+    addButton.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      zutatenZeileHinzufuegen264(ziel);
+      return false;
+    };
+
+    (zutaten.length ? zutaten : [{}]).forEach(zutat => {
+      const daten = zutatAnalysieren264(zutat);
+      zutatenZeileHinzufuegen264(
+        ziel,
+        daten.originalMenge || daten.menge || "",
+        daten.originalEinheit || daten.einheit || "",
+        daten.name || ""
+      );
+    });
+
+    return box;
+  }
+
+  // Fängt auch alte X-Buttons ab, bevor alte onclick-Handler laufen.
+  document.addEventListener("click", function (event) {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+
+    if (button.closest(".zutaten-zeile")) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      entferneZutatenZeile264(button);
+      return false;
+    }
+  }, true);
+
+  window.zutatenZeileHinzufuegen = zutatenZeileHinzufuegen264;
+  window.zutatenGruppeHinzufuegen = zutatenGruppeHinzufuegen264;
+  window.rf264ZutatenZeilenBereinigen = normalisiereAlleZutatenZeilen264;
+
+  try { zutatenZeileHinzufuegen = zutatenZeileHinzufuegen264; } catch (error) {}
+  try { zutatenGruppeHinzufuegen = zutatenGruppeHinzufuegen264; } catch (error) {}
+
+  document.addEventListener("DOMContentLoaded", normalisiereAlleZutatenZeilen264);
+  window.addEventListener("load", normalisiereAlleZutatenZeilen264);
+
+  const observer = new MutationObserver(function (mutations) {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        if (node.classList.contains("zutaten-zeile")) normalisiereZutatenZeile264(node);
+        node.querySelectorAll?.(".zutaten-zeile").forEach(normalisiereZutatenZeile264);
+      }
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    observer.observe(document.body, { childList: true, subtree: true });
+  });
+})();
