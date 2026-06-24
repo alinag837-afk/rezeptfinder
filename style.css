@@ -1223,3 +1223,26 @@ section[hidden] {
   color: #ffffff !important;
   white-space: nowrap;
 }
+
+/* VERSION 2.65 - Zutatenzeilen: genau ein Entfernen-Button */
+#zutatenGruppen .zutaten-zeile {
+  display: grid !important;
+  grid-template-columns: minmax(90px, 1fr) minmax(110px, 1fr) minmax(160px, 2fr) auto !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+#zutatenGruppen .zutaten-zeile > button.rf265-zutat-entfernen {
+  margin-top: 0 !important;
+  white-space: nowrap !important;
+}
+
+#zutatenGruppen .zutaten-zeilen > button:not(.rf264-zutat-hinzufuegen):not(.rf265-zutat-entfernen) {
+  display: none !important;
+}
+
+@media (max-width: 700px) {
+  #zutatenGruppen .zutaten-zeile {
+    grid-template-columns: 1fr !important;
+  }
+}

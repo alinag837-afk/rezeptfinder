@@ -36021,3 +36021,137 @@ window.addEventListener("load", function () {
     observer.observe(document.body, { childList: true, subtree: true });
   });
 })();
+
+/* =====================================================
+   VERSION 2.65 - Zutatenzeilen endgültig bereinigen
+   Ziel: In jeder Zutatenzeile gibt es genau EINEN Button.
+   Alte Papierkorb-Buttons, die durch ältere Versionsblöcke zusätzlich
+   eingefügt wurden, werden entfernt. Der verbleibende Button löscht
+   ausschließlich seine eigene Zutatenzeile.
+   ===================================================== */
+(function () {
+  "use strict";
+
+  const REMOVE_BUTTON_CLASS = "rf265-zutat-entfernen";
+
+  function isIngredientArea(element) {
+    return !!(element && element.closest && element.closest("#zutatenGruppen"));
+  }
+
+  function removeExtraSiblingButtons(container) {
+    if (!container) return;
+
+    Array.from(container.children).forEach(child => {
+      if (!(child instanceof HTMLElement)) return;
+
+      // Alte Fixes haben teilweise Papierkorb-Buttons direkt zwischen die Zeilen gesetzt.
+      if (child.tagName === "BUTTON") {
+        const text = (child.textContent || "").trim().toLowerCase();
+        const cls = child.className || "";
+        const looksLikeOldDelete =
+          text === "🗑" ||
+          text === "x" ||
+          text === "entfernen" ||
+          cls.includes("zutat-loeschen") ||
+          cls.includes("zutat-entfernen") ||
+          cls.includes("rf239") ||
+          cls.includes("rf241") ||
+          cls.includes("rf243") ||
+          cls.includes("rf263") ||
+          cls.includes("rf264");
+
+        if (looksLikeOldDelete) child.remove();
+      }
+    });
+  }
+
+  function normalizeIngredientRow(row) {
+    if (!(row instanceof HTMLElement)) return;
+    if (!row.classList.contains("zutaten-zeile")) return;
+
+    // Alle vorhandenen Button-Reste in der Zeile entfernen.
+    row.querySelectorAll("button").forEach(button => button.remove());
+
+    let button = document.createElement("button");
+    button.type = "button";
+    button.className = REMOVE_BUTTON_CLASS;
+    button.textContent = "Entfernen";
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      row.remove();
+      return false;
+    });
+
+    row.appendChild(button);
+  }
+
+  function normalizeAllIngredientRows() {
+    const root = document.getElementById("zutatenGruppen");
+    if (!root) return;
+
+    root.querySelectorAll(".zutaten-zeilen").forEach(removeExtraSiblingButtons);
+    root.querySelectorAll(".zutaten-zeile").forEach(normalizeIngredientRow);
+  }
+
+  function attachSafeDelegatedDelete() {
+    document.addEventListener("click", function (event) {
+      const button = event.target && event.target.closest ? event.target.closest("button") : null;
+      if (!button || !isIngredientArea(button)) return;
+
+      const row = button.closest(".zutaten-zeile");
+      if (!row) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      row.remove();
+      return false;
+    }, true);
+  }
+
+  const previousAddRow = window.zutatenZeileHinzufuegen;
+  window.zutatenZeileHinzufuegen = function (bereich, menge = "", einheit = "", name = "") {
+    let row = null;
+
+    if (typeof previousAddRow === "function") {
+      row = previousAddRow.call(this, bereich, menge, einheit, name);
+    } else {
+      const ziel = bereich || document.querySelector(".zutaten-zeilen");
+      if (!ziel) return null;
+      row = document.createElement("div");
+      row.className = "zutaten-zeile";
+      row.innerHTML = `
+        <input class="zutat-menge" placeholder="Menge" value="${String(menge ?? "").replaceAll('"', '&quot;')}">
+        <select class="zutat-einheit"><option>${String(einheit || "Einheit")}</option></select>
+        <input class="zutat-name" placeholder="Zutat" value="${String(name ?? "").replaceAll('"', '&quot;')}">
+      `;
+      ziel.appendChild(row);
+    }
+
+    normalizeAllIngredientRows();
+    return row;
+  };
+
+  try { zutatenZeileHinzufuegen = window.zutatenZeileHinzufuegen; } catch (error) {}
+
+  attachSafeDelegatedDelete();
+
+  document.addEventListener("DOMContentLoaded", function () {
+    normalizeAllIngredientRows();
+
+    const root = document.getElementById("zutatenGruppen");
+    if (!root || !window.MutationObserver) return;
+
+    const observer = new MutationObserver(function () {
+      // Warten bis ältere Observer ihre Zusatzbuttons eingefügt haben, dann bereinigen.
+      window.requestAnimationFrame(normalizeAllIngredientRows);
+    });
+
+    observer.observe(root, { childList: true, subtree: true });
+  });
+
+  window.addEventListener("load", normalizeAllIngredientRows);
+  window.rf265ZutatenButtonsBereinigen = normalizeAllIngredientRows;
+})();
