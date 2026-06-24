@@ -1206,43 +1206,11 @@ section[hidden] {
   }
 }
 
-/* VERSION 2.63 Zutaten-Entfernen stabil */
-.zutaten-zeile .rf263-zutat-entfernen {
+
+/* VERSION 2.66: genau ein Zutaten-Entfernen-Button pro Zeile */
+#zutatenGruppen .zutaten-zeile .rf266-zutat-entfernen,
+#zutatenGruppen .zutat-zeile .rf266-zutat-entfernen {
   margin-top: 0;
   background: #b00020;
   color: #ffffff;
-  white-space: nowrap;
-}
-
-
-/* VERSION 2.64 Zutatenzeilen: genau ein stabiler Entfernen-Button */
-.zutaten-zeile button,
-.rf264-zutat-entfernen {
-  margin-top: 0 !important;
-  background: #b00020 !important;
-  color: #ffffff !important;
-  white-space: nowrap;
-}
-
-/* VERSION 2.65 - Zutatenzeilen: genau ein Entfernen-Button */
-#zutatenGruppen .zutaten-zeile {
-  display: grid !important;
-  grid-template-columns: minmax(90px, 1fr) minmax(110px, 1fr) minmax(160px, 2fr) auto !important;
-  gap: 8px !important;
-  align-items: center !important;
-}
-
-#zutatenGruppen .zutaten-zeile > button.rf265-zutat-entfernen {
-  margin-top: 0 !important;
-  white-space: nowrap !important;
-}
-
-#zutatenGruppen .zutaten-zeilen > button:not(.rf264-zutat-hinzufuegen):not(.rf265-zutat-entfernen) {
-  display: none !important;
-}
-
-@media (max-width: 700px) {
-  #zutatenGruppen .zutaten-zeile {
-    grid-template-columns: 1fr !important;
-  }
 }
