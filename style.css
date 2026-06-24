@@ -1217,3 +1217,12 @@ section[hidden] {
 #zutatenGruppen button.rf243-zutat-loeschen {
   display: none !important;
 }
+
+
+/* VERSION 2.70 Zutatenzeile löschen */
+.zutaten-zeile .zutat-zeile-entfernen,
+.zutat-zeile .zutat-zeile-entfernen {
+  margin-top: 0;
+  background: #b00020;
+  color: #ffffff;
+}
