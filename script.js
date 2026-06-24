@@ -36003,3 +36003,102 @@ window.addEventListener("load", function () {
     setTimeout(function () { bindStartButtons(); enforceStartPage(); }, 3300);
   });
 })();
+
+/* VERSION 2.58 Fix: Zutatenzeile hat genau einen funktionierenden Entfernen-Button
+   Entfernt alte Papierkorb-/Doppelbuttons und verhindert, dass alte Fix-Blöcke
+   wieder zusätzliche Buttons in dynamisch erzeugte Zutatenzeilen schreiben. */
+(function () {
+  'use strict';
+
+  const BUTTON_CLASS = 'rf258-zutat-entfernen';
+  let normalizing = false;
+
+  function container() {
+    return document.getElementById('zutatenGruppen');
+  }
+
+  function rows() {
+    const c = container();
+    return c ? Array.from(c.querySelectorAll('.zutaten-zeile, .zutat-zeile')) : [];
+  }
+
+  function removeRow(row) {
+    if (!row) return;
+
+    const group = row.closest('.zutatengruppe');
+    row.remove();
+
+    if (group) {
+      const remaining = group.querySelectorAll('.zutaten-zeile, .zutat-zeile');
+      const groups = Array.from(document.querySelectorAll('#zutatenGruppen .zutatengruppe'));
+
+      // Die erste Gruppe bleibt erhalten, leere Zusatzgruppen werden entfernt.
+      if (!remaining.length && groups.indexOf(group) > 0) {
+        group.remove();
+      }
+    }
+  }
+
+  function makeButton() {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = BUTTON_CLASS;
+    btn.textContent = 'Entfernen';
+    btn.title = 'Diese Zutat entfernen';
+    btn.setAttribute('aria-label', 'Zutat entfernen');
+    return btn;
+  }
+
+  function normalize() {
+    if (normalizing) return;
+    normalizing = true;
+
+    try {
+      rows().forEach((row) => {
+        // In einer Zutatenzeile darf es genau einen Button geben: Entfernen.
+        Array.from(row.querySelectorAll('button')).forEach((btn) => btn.remove());
+        row.appendChild(makeButton());
+      });
+    } finally {
+      normalizing = false;
+    }
+  }
+
+  document.addEventListener('click', function (event) {
+    const btn = event.target && event.target.closest ? event.target.closest('button') : null;
+    if (!btn || !btn.classList.contains(BUTTON_CLASS)) return;
+
+    const row = btn.closest('.zutaten-zeile, .zutat-zeile');
+    if (!row) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+    removeRow(row);
+  }, true);
+
+  function start() {
+    const c = container();
+    if (!c) return;
+
+    normalize();
+
+    if (c.dataset.rf258Observer === '1') return;
+    c.dataset.rf258Observer = '1';
+
+    const observer = new MutationObserver(() => {
+      window.requestAnimationFrame(normalize);
+    });
+    observer.observe(c, { childList: true, subtree: true });
+  }
+
+  document.addEventListener('DOMContentLoaded', start);
+  window.addEventListener('load', function () {
+    start();
+    setTimeout(normalize, 100);
+    setTimeout(normalize, 400);
+    setTimeout(normalize, 1200);
+  });
+
+  window.rf258NormalizeIngredientDeleteButtons = normalize;
+})();

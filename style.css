@@ -1222,3 +1222,15 @@ body.rf257-startseite #ergebnisse {
 #cloudBackupPanel.rf257-open {
   margin-top: 12px;
 }
+
+
+/* VERSION 2.58 Zutaten-Entfernen-Button: nur ein Button pro Zeile */
+#zutatenGruppen .rf258-zutat-entfernen {
+  margin-top: 0;
+  background: #b00020;
+  color: #ffffff;
+  white-space: nowrap;
+}
+#zutatenGruppen .rf258-zutat-entfernen:hover {
+  background: #8f001a;
+}
