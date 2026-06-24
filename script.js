@@ -36121,3 +36121,218 @@ window.addEventListener("load", function () {
     return { version: '2.60', buttons: found, userOpenedArea, backupOpen };
   };
 })();
+
+/* VERSION 2.61 Zentraler Button-Controller
+   Ziel: Alle wirklich verwendeten Buttons werden vor alten Document-Click-Fixes abgefangen.
+   Wichtig: Der Handler läuft auf window/capture, ist sehr klein und blockiert nur bekannte Buttons. */
+(function () {
+  'use strict';
+
+  const WORK_AREAS = [
+    'sucheBereich',
+    'rezeptSucheBereich',
+    'formularBereich',
+    'einkaufBereich',
+    'textImportBereich',
+    'datenpruefungBereich'
+  ];
+
+  function $(id) { return document.getElementById(id); }
+
+  function show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = '';
+    el.classList.remove('versteckt', 'rf194-closed', 'rf190-cloud-hidden');
+  }
+
+  function hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = 'none';
+    el.classList.add('versteckt');
+  }
+
+  function showOnly(areaId, showResults) {
+    document.body.classList.remove('rf257-startseite', 'rf205-start', 'rf196-startseite', 'startseite-clean');
+    WORK_AREAS.forEach(id => id === areaId ? show($(id)) : hide($(id)));
+    const results = $('ergebnisse');
+    if (results) showResults ? show(results) : hide(results);
+  }
+
+  function safeCall(names, ...args) {
+    for (const name of names) {
+      const fn = window[name];
+      if (typeof fn === 'function' && fn !== safeCall) {
+        try { return fn.apply(window, args); }
+        catch (error) { console.warn('Button-Funktion fehlgeschlagen:', name, error); }
+      }
+    }
+    return undefined;
+  }
+
+  function normalizeText(text) {
+    return (text || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function stop(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+  }
+
+  function refreshFormButtons() {
+    setTimeout(() => safeCall(['rf258NormalizeIngredientDeleteButtons', 'rf256EnsureIngredientDeleteButtons']), 20);
+  }
+
+  function openCloudBackups() {
+    const panel = $('cloudBackupPanel');
+    if (!panel) return;
+
+    const isOpen = !panel.hidden && panel.style.display !== 'none' && !panel.classList.contains('versteckt');
+    if (isOpen) {
+      hide(panel);
+      const btn = $('rf207CloudBackups');
+      if (btn) btn.textContent = 'Cloud-Backups anzeigen';
+      return;
+    }
+
+    show(panel);
+    panel.innerHTML = '<p>Cloud-Backups werden geladen ...</p>';
+    const btn = $('rf207CloudBackups');
+    if (btn) btn.textContent = 'Cloud-Backups ausblenden';
+
+    const result = safeCall([
+      'cloudBackupsAnzeigen',
+      'cloudBackups',
+      'rf222LoadBackupsIntoBox',
+      'rf221ToggleBackups',
+      'rf220OpenBackups',
+      'rf218ToggleBackups'
+    ]);
+
+    setTimeout(() => {
+      show(panel);
+      if (!panel.textContent.trim() || panel.textContent.includes('werden geladen')) {
+        const candidates = Array.from(document.querySelectorAll('div,section'))
+          .filter(el => el !== panel && /backup|wiederherstellen|cloud/i.test(el.textContent || ''));
+        const found = candidates.find(el => el.id && /backup/i.test(el.id) && el.innerHTML.trim());
+        if (found) panel.innerHTML = found.innerHTML;
+      }
+      if (!panel.textContent.trim() || panel.textContent.includes('werden geladen')) {
+        panel.innerHTML = result === undefined
+          ? '<p>Keine Cloud-Backups gefunden oder Backup-Funktion nicht verfügbar.</p>'
+          : panel.innerHTML;
+      }
+    }, 250);
+  }
+
+  function resetShoppingList() {
+    const ok = window.confirm ? window.confirm('Einkaufsliste wirklich zurücksetzen?') : true;
+    if (!ok) return;
+
+    safeCall(['einkaufslisteZuruecksetzen']);
+
+    // Fallback: alle bekannten lokalen Einkaufslisten-Schlüssel entfernen.
+    [
+      'einkaufsliste',
+      'rf_einkaufsliste',
+      'rezeptfinder_einkaufsliste',
+      'shoppingList',
+      'rf187_einkaufsliste'
+    ].forEach(key => {
+      try { localStorage.removeItem(key); } catch (_) {}
+    });
+
+    const list = $('einkaufsliste');
+    if (list) list.innerHTML = '';
+    safeCall(['rf187RenderEinkaufsliste', 'rf181FormatEinkaufsliste', 'einkaufslisteErstellen', 'einkaufslisteAnzeigen']);
+  }
+
+  function handleKnownButton(event) {
+    const button = event.target && event.target.closest ? event.target.closest('button') : null;
+    if (!button) return;
+
+    const id = button.id || '';
+    const text = normalizeText(button.textContent);
+    const onclick = button.getAttribute('onclick') || '';
+    const section = button.closest('section');
+    const sectionId = section ? section.id : '';
+
+    // Startseite
+    if (id === 'rf207RezepteSuchen') { stop(event); showOnly('rezeptSucheBereich', false); safeCall(['rezeptSucheKategorienFuellen', 'rf158SucheNeuLaden', 'rf159SucheAktualisieren']); return; }
+    if (id === 'rf207RezeptHinzufuegen') { stop(event); showOnly('formularBereich', false); safeCall(['zutatenZeilenAufMinimum']); refreshFormButtons(); return; }
+    if (id === 'rf207AlleRezepte') { stop(event); showOnly('sucheBereich', true); safeCall(['filterAnwenden', 'alleRezepteAnzeigen', 'alleRezepteStartAnzeigen']); return; }
+    if (id === 'rf207Einkaufsliste') { stop(event); showOnly('einkaufBereich', false); safeCall(['rf187LadeEinkaufsliste', 'rf187RenderEinkaufsliste', 'einkaufslisteErstellen', 'einkaufsliste']); return; }
+    if (id === 'rf207RezeptAssistent') { stop(event); showOnly('textImportBereich', false); return; }
+    if (id === 'rf207RezeptePruefen') { stop(event); showOnly('datenpruefungBereich', false); safeCall(['datenqualitaetPruefen', 'rezeptePruefen', 'rf210DatenqualitaetPruefen']); return; }
+    if (id === 'rf207CloudSpeichern') { stop(event); safeCall(['cloudSpeichernAlleDirekt', 'cloudSpeichernAlle', 'rf252CloudUploadManualOnly', 'rf217CloudUpload']); return; }
+    if (id === 'rf207CloudLaden') { stop(event); safeCall(['cloudLaden', 'ausCloudLaden', 'cloudHerunterladen', 'rf252CloudLoadMerge', 'rf240CloudLaden']); return; }
+    if (id === 'rf207CloudBackups') { stop(event); openCloudBackups(); return; }
+    if (id === 'rf207BackupDownload') { stop(event); safeCall(['manuellesBackupHerunterladen', 'backupHerunterladen', 'backupExportieren', 'backupDownload', 'rezepteExportieren']); return; }
+
+    // Alle-Rezepte-Bereich
+    if (onclick.includes('kategorieKachelUmschalten')) { stop(event); safeCall(['kategorieKachelUmschalten'], button); return; }
+    if (sectionId === 'sucheBereich' && text === 'alle anzeigen') { stop(event); showOnly('sucheBereich', true); safeCall(['filterAnwenden', 'alleRezepteAnzeigen']); return; }
+    if (sectionId === 'sucheBereich' && text === 'alle kategorien auswählen') { stop(event); safeCall(['kategorienAufAlleSetzen']); return; }
+    if (sectionId === 'sucheBereich' && text === 'zurücksetzen') { stop(event); safeCall(['sucheZuruecksetzen']); return; }
+
+    // Formular
+    if (sectionId === 'formularBereich' && text === 'zutatengruppe hinzufügen') { stop(event); safeCall(['zutatenGruppeHinzufuegen']); refreshFormButtons(); return; }
+    if (id === 'rf235SaveButton' || (sectionId === 'formularBereich' && text === 'rezept speichern')) { stop(event); safeCall(['rf155RezeptSpeichern', 'rf154RezeptSpeichern', 'rezeptSpeichern', 'rezeptSpeichernCloudSicher']); return; }
+    if (sectionId === 'formularBereich' && text === 'formular leeren') { stop(event); safeCall(['formularLeeren', 'rezeptNeuStarten']); refreshFormButtons(); return; }
+    if (sectionId === 'formularBereich' && (text === 'entfernen' || text === '🗑' || text === 'löschen')) {
+      stop(event);
+      const row = button.closest('.zutaten-zeile');
+      const group = button.closest('.zutatengruppe');
+      if (row) row.remove();
+      else if (group && button.closest('.zutatengruppe-kopf')) group.remove();
+      refreshFormButtons();
+      return;
+    }
+
+    // Einkaufsliste
+    if (sectionId === 'einkaufBereich' && (text === 'download / pdf' || text === 'pdf' || text.includes('download'))) { stop(event); safeCall(['einkaufslisteDrucken']); return; }
+    if (sectionId === 'einkaufBereich' && text.includes('einkaufsliste zurücksetzen')) { stop(event); resetShoppingList(); return; }
+
+    // Rezeptsuche
+    if (sectionId === 'rezeptSucheBereich' && text === 'suchen') { stop(event); safeCall(['rezeptSucheAusfuehren', 'rf160SucheAnzeigen', 'sucheRezepte']); return; }
+    if (sectionId === 'rezeptSucheBereich' && text === 'suche löschen') { stop(event); safeCall(['rezeptSucheZuruecksetzen']); return; }
+
+    // Rezept-Assistent
+    if (id === 'rezeptAnalysierenButton' || (sectionId === 'textImportBereich' && text === 'rezept analysieren')) { stop(event); safeCall(['rf153AssistentVorschau', 'rf152AssistentVorschau', 'rezeptAssistentAnalysieren', 'rezeptTextAnalysieren']); return; }
+    if (id === 'rezeptAssistentResetButton' || (sectionId === 'textImportBereich' && text === 'zurücksetzen')) { stop(event); safeCall(['rezeptAssistentZuruecksetzen', 'rf198AssistentReset', 'resetAssistant']); return; }
+
+    // Dynamische Standard-Buttons in Rezeptkarten: absichtlich nicht blockieren,
+    // damit bestehende Inline-Funktionen wie rezeptAnsehen(index) weiterlaufen.
+  }
+
+  function prepareStaticButtons() {
+    document.querySelectorAll('button').forEach(button => {
+      button.type = 'button';
+      button.disabled = false;
+      button.removeAttribute('disabled');
+    });
+    refreshFormButtons();
+  }
+
+  window.addEventListener('click', handleKnownButton, true);
+  document.addEventListener('DOMContentLoaded', prepareStaticButtons);
+  window.addEventListener('load', function () {
+    prepareStaticButtons();
+    setTimeout(prepareStaticButtons, 250);
+    setTimeout(prepareStaticButtons, 1000);
+  });
+
+  window.rf261ButtonDiagnose = function () {
+    return Array.from(document.querySelectorAll('button')).map(button => ({
+      id: button.id || '',
+      text: normalizeText(button.textContent),
+      section: button.closest('section') ? button.closest('section').id : '',
+      onclick: button.getAttribute('onclick') || ''
+    }));
+  };
+})();
