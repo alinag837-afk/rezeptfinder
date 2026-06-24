@@ -35682,3 +35682,112 @@ window.addEventListener("load", function () {
     });
   });
 })();
+
+/* VERSION 2.56 Fix: Zutaten-Zeilen im Formular zuverlässig entfernen
+   Grund: ältere Fix-Blöcke entfernen nachträglich erzeugte Löschbuttons wieder.
+   Dieser Block verwendet daher einen eigenen Button mit neutralem Text und
+   zusätzlich ein delegiertes Click-Handling für alte X-/Löschen-Buttons. */
+(function () {
+  function getContainer() {
+    return document.getElementById('zutatenGruppen');
+  }
+
+  function isIngredientRow(element) {
+    return element && element.matches && (element.matches('.zutaten-zeile') || element.matches('.zutat-zeile'));
+  }
+
+  function removeIngredientRow(row) {
+    if (!isIngredientRow(row)) return false;
+
+    const group = row.closest('.zutatengruppe');
+    row.remove();
+
+    if (group) {
+      const remainingRows = group.querySelectorAll('.zutaten-zeile, .zutat-zeile');
+      const allGroups = Array.from(document.querySelectorAll('#zutatenGruppen .zutatengruppe'));
+
+      // Die erste Gruppe bleibt immer erhalten; leere Zusatzgruppen dürfen verschwinden.
+      if (!remainingRows.length && allGroups.indexOf(group) > 0) {
+        group.remove();
+      }
+    }
+
+    return true;
+  }
+
+  function ensureIngredientDeleteButtons() {
+    const container = getContainer();
+    if (!container) return;
+
+    container.querySelectorAll('.zutaten-zeile, .zutat-zeile').forEach((row) => {
+      if (row.querySelector('.rf256-zutat-entfernen')) return;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'rf256-zutat-entfernen';
+      button.textContent = 'Entfernen';
+      button.title = 'Diese Zutat entfernen';
+      button.setAttribute('aria-label', 'Zutat entfernen');
+
+      row.appendChild(button);
+    });
+  }
+
+  function bindObserver() {
+    const container = getContainer();
+    if (!container || container.dataset.rf256Observer === '1') return;
+
+    container.dataset.rf256Observer = '1';
+    const observer = new MutationObserver(() => {
+      setTimeout(ensureIngredientDeleteButtons, 30);
+      setTimeout(ensureIngredientDeleteButtons, 120);
+    });
+
+    observer.observe(container, { childList: true, subtree: true });
+  }
+
+  document.addEventListener('click', function (event) {
+    const button = event.target && event.target.closest ? event.target.closest('button') : null;
+    if (!button) return;
+
+    const container = getContainer();
+    if (!container || !container.contains(button)) return;
+
+    const row = button.closest('.zutaten-zeile, .zutat-zeile');
+    if (!row) return;
+
+    const text = String(button.textContent || '').trim().toLowerCase();
+    const isKnownDeleteButton =
+      button.classList.contains('rf256-zutat-entfernen') ||
+      button.classList.contains('rf239-zutat-loeschen') ||
+      button.classList.contains('rf241-zutat-loeschen') ||
+      button.classList.contains('rf243-zutat-loeschen') ||
+      text === 'x' ||
+      text === '×' ||
+      text === 'entfernen' ||
+      text.includes('zutat löschen') ||
+      text.includes('zutat loeschen');
+
+    if (!isKnownDeleteButton) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+    removeIngredientRow(row);
+  }, true);
+
+  function run() {
+    bindObserver();
+    ensureIngredientDeleteButtons();
+  }
+
+  window.rf256EnsureIngredientDeleteButtons = ensureIngredientDeleteButtons;
+
+  window.addEventListener('load', function () {
+    run();
+    setTimeout(run, 250);
+    setTimeout(run, 900);
+    setTimeout(run, 1800);
+    setTimeout(run, 3200);
+  });
+})();
