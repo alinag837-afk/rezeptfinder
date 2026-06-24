@@ -1205,3 +1205,11 @@ section[hidden] {
     grid-template-columns: 1fr;
   }
 }
+
+/* VERSION 2.63 Zutaten-Entfernen stabil */
+.zutaten-zeile .rf263-zutat-entfernen {
+  margin-top: 0;
+  background: #b00020;
+  color: #ffffff;
+  white-space: nowrap;
+}

@@ -35628,3 +35628,195 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+/* =====================================================
+   VERSION 2.63 - gezielter Fix: Zutaten-Zeilen entfernen
+   ===================================================== */
+(function () {
+  "use strict";
+
+  function esc263(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function norm263(value) {
+    return String(value || "")
+      .toLowerCase()
+      .trim()
+      .replaceAll("ä", "ae")
+      .replaceAll("ö", "oe")
+      .replaceAll("ü", "ue")
+      .replaceAll("ß", "ss")
+      .replaceAll(".", "");
+  }
+
+  function einheiten263() {
+    return Array.isArray(window.EINHEITEN) && window.EINHEITEN.length
+      ? window.EINHEITEN
+      : ["", "g", "dag", "kg", "ml", "cl", "dl", "l", "TL", "EL", "Stk.", "Prise", "Päckchen", "Dose", "Glas", "Bund", "Zweig", "Blatt", "Scheibe"];
+  }
+
+  function zutatAnalysieren263(zutat) {
+    if (typeof window.zutatAnalysieren === "function") {
+      try { return window.zutatAnalysieren(zutat); } catch (error) {}
+    }
+    if (zutat && typeof zutat === "object") {
+      return {
+        originalMenge: zutat.menge || "",
+        originalEinheit: zutat.einheit || "",
+        einheit: zutat.einheit || "",
+        name: zutat.name || ""
+      };
+    }
+    return { originalMenge: "", originalEinheit: "", einheit: "", name: String(zutat || "") };
+  }
+
+  function entferneZutatenZeile(button) {
+    const zeile = button && button.closest ? button.closest(".zutaten-zeile") : null;
+    if (!zeile) return false;
+
+    const gruppe = zeile.closest(".zutatengruppe");
+    const alleZeilen = gruppe ? gruppe.querySelectorAll(".zutaten-zeile") : [];
+
+    zeile.remove();
+
+    // Eine leere Gruppe soll weiterhin eine Eingabezeile behalten,
+    // damit das Formular nach dem Entfernen direkt weiter benutzbar bleibt.
+    if (gruppe && alleZeilen.length <= 1) {
+      const ziel = gruppe.querySelector(".zutaten-zeilen");
+      if (ziel && typeof window.zutatenZeileHinzufuegen === "function") {
+        window.zutatenZeileHinzufuegen(ziel);
+      }
+    }
+    return false;
+  }
+
+  function zutatenZeileHinzufuegen263(bereich, menge = "", einheit = "", name = "") {
+    const ziel = bereich || document.querySelector(".zutaten-zeilen");
+    if (!ziel) return null;
+
+    const div = document.createElement("div");
+    div.className = "zutaten-zeile";
+
+    const optionen = einheiten263().map(e => {
+      const selected = norm263(e) === norm263(einheit) ? " selected" : "";
+      return `<option value="${esc263(e)}"${selected}>${esc263(e || "Einheit")}</option>`;
+    }).join("");
+
+    div.innerHTML = `
+      <input class="zutat-menge" placeholder="Menge" value="${esc263(menge)}">
+      <select class="zutat-einheit">${optionen}</select>
+      <input class="zutat-name" placeholder="Zutat" value="${esc263(name)}">
+      <button type="button" class="rf263-zutat-entfernen">Entfernen</button>
+    `;
+
+    const removeButton = div.querySelector(".rf263-zutat-entfernen");
+    removeButton.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      entferneZutatenZeile(removeButton);
+    });
+
+    ziel.appendChild(div);
+    return div;
+  }
+
+  function zutatenGruppeHinzufuegen263(name = "Zutaten", zutaten = []) {
+    const container = document.getElementById("zutatenGruppen");
+    if (!container) return null;
+
+    const box = document.createElement("div");
+    box.className = "zutatengruppe";
+    box.innerHTML = `
+      <div class="zutatengruppe-kopf">
+        <input class="zutaten-gruppenname" placeholder="Gruppe, z. B. Teig, Fülle, Glasur" value="${esc263(name)}">
+        <button type="button" class="rf263-gruppe-entfernen">Gruppe löschen</button>
+      </div>
+      <div class="zutaten-zeilen"></div>
+      <button type="button" class="rf263-zutat-hinzufuegen">Zutat hinzufügen</button>
+    `;
+
+    container.appendChild(box);
+
+    box.querySelector(".rf263-gruppe-entfernen").addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      box.remove();
+      if (!container.querySelector(".zutatengruppe")) {
+        zutatenGruppeHinzufuegen263("Zutaten");
+      }
+    });
+
+    const ziel = box.querySelector(".zutaten-zeilen");
+    box.querySelector(".rf263-zutat-hinzufuegen").addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      zutatenZeileHinzufuegen263(ziel);
+    });
+
+    (zutaten.length ? zutaten : [{}]).forEach(zutat => {
+      const daten = zutatAnalysieren263(zutat);
+      zutatenZeileHinzufuegen263(
+        ziel,
+        daten.originalMenge || daten.menge || "",
+        daten.originalEinheit || daten.einheit || "",
+        daten.name || ""
+      );
+    });
+
+    return box;
+  }
+
+  function bereinigeVorhandeneZeilen() {
+    document.querySelectorAll(".zutaten-zeile").forEach(zeile => {
+      const alteButtons = Array.from(zeile.querySelectorAll("button"));
+      alteButtons.forEach((button, index) => {
+        if (index > 0 || !button.classList.contains("rf263-zutat-entfernen")) button.remove();
+      });
+
+      let button = zeile.querySelector(".rf263-zutat-entfernen");
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.className = "rf263-zutat-entfernen";
+        button.textContent = "Entfernen";
+        zeile.appendChild(button);
+      }
+      button.textContent = "Entfernen";
+      button.type = "button";
+      if (!button.__rf263Bound) {
+        button.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          entferneZutatenZeile(button);
+        });
+        button.__rf263Bound = true;
+      }
+    });
+  }
+
+  window.zutatenZeileHinzufuegen = zutatenZeileHinzufuegen263;
+  window.zutatenGruppeHinzufuegen = zutatenGruppeHinzufuegen263;
+  window.rf263ZutatenZeilenBereinigen = bereinigeVorhandeneZeilen;
+
+  try { zutatenZeileHinzufuegen = zutatenZeileHinzufuegen263; } catch (error) {}
+  try { zutatenGruppeHinzufuegen = zutatenGruppeHinzufuegen263; } catch (error) {}
+
+  document.addEventListener("click", function (event) {
+    const button = event.target && event.target.closest ? event.target.closest("button") : null;
+    if (!button) return;
+    if (button.classList.contains("rf263-zutat-entfernen")) {
+      event.preventDefault();
+      event.stopPropagation();
+      entferneZutatenZeile(button);
+    }
+  }, true);
+
+  window.addEventListener("load", function () {
+    bereinigeVorhandeneZeilen();
+  });
+})();
