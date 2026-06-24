@@ -1185,3 +1185,7 @@ section[hidden] {
   .rf254-aktionen button,
   .button-gruppe button { width: 100%; }
 }
+
+
+/* VERSION 2.55 kleine Fix-Markierung: Einkaufsliste Reset stabilisiert */
+.einkauf-leer{color:#475569;font-weight:600;}

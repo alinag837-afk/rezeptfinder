@@ -35628,3 +35628,57 @@ window.addEventListener("load", function () {
     };
   };
 })();
+
+/* VERSION 2.55 Fix: Einkaufsliste zuverlässig zurücksetzen
+   Grund: ältere Versionsblöcke verwenden teils unterschiedliche Storage-Keys
+   und der v2.54-Button ruft die Funktion nur indirekt auf. */
+(function () {
+  function rf255SetJson(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.warn('Konnte Einkaufsliste-Key nicht speichern:', key, error);
+    }
+  }
+
+  function rf255RenderEmptyShoppingList() {
+    const targets = [
+      document.getElementById('einkaufsliste'),
+      document.getElementById('einkaufslisteInhalt'),
+      document.getElementById('einkaufslisteListe'),
+      document.querySelector('#einkaufslisteBereich .inhalt')
+    ].filter(Boolean);
+
+    targets.forEach((target) => {
+      if (target.tagName === 'UL' || target.tagName === 'OL') {
+        target.innerHTML = '<li class="einkauf-leer">Die Einkaufsliste wurde gelöscht.</li>';
+      } else {
+        target.innerHTML = '<p class="einkauf-leer">Die Einkaufsliste wurde gelöscht.</p>';
+      }
+    });
+  }
+
+  window.einkaufslisteZuruecksetzen = function einkaufslisteZuruecksetzen() {
+    if (!confirm('Einkaufsliste wirklich zurücksetzen?')) return;
+
+    ['einkaufsliste', 'einkaufsListe', 'shoppingList', 'abgehakteEinkaufsliste'].forEach((key) => {
+      rf255SetJson(key, []);
+    });
+
+    rf255RenderEmptyShoppingList();
+
+    if (typeof meldungAnzeigen === 'function') {
+      meldungAnzeigen('Einkaufsliste wurde zurückgesetzt.');
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-action="reset-shopping-list"]').forEach((button) => {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        window.einkaufslisteZuruecksetzen();
+      });
+    });
+  });
+})();
