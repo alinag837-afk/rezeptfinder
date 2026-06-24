@@ -36102,3 +36102,204 @@ window.addEventListener("load", function () {
 
   window.rf258NormalizeIngredientDeleteButtons = normalize;
 })();
+
+/* VERSION 2.59 Fix: Startseiten-Buttons zuverlässig klickbar
+   Grund: ältere Versionsblöcke registrieren mehrere konkurrierende Click-Handler.
+   Dieser letzte Block fängt nur die Startseiten-Buttons ab und führt die passende Aktion
+   direkt aus, bevor alte Handler den Klick blockieren können. */
+(function () {
+  'use strict';
+
+  const AREAS = [
+    'sucheBereich',
+    'rezeptSucheBereich',
+    'formularBereich',
+    'einkaufBereich',
+    'textImportBereich',
+    'datenpruefungBereich'
+  ];
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function show(el) {
+    if (!el) return;
+    el.hidden = false;
+    el.style.display = '';
+    el.classList.remove('versteckt');
+  }
+
+  function hide(el) {
+    if (!el) return;
+    el.hidden = true;
+    el.style.display = 'none';
+    el.classList.add('versteckt');
+  }
+
+  function openOnly(areaId) {
+    document.body.classList.remove('rf257-startseite', 'rf205-start', 'rf196-startseite', 'startseite-clean');
+    AREAS.forEach((id) => {
+      const area = $(id);
+      if (id === areaId) show(area);
+      else hide(area);
+    });
+
+    const results = $('ergebnisse');
+    if (results) {
+      if (areaId === 'sucheBereich') show(results);
+      else hide(results);
+    }
+  }
+
+  function callFunction(names) {
+    for (const name of names) {
+      const fn = window[name];
+      if (typeof fn === 'function' && fn !== callFunction) {
+        try {
+          return fn.call(window);
+        } catch (error) {
+          console.error('Fehler beim Ausführen von', name, error);
+        }
+      }
+    }
+    return false;
+  }
+
+  function refreshLists() {
+    callFunction(['rf253RefreshLists', 'tagsAktualisieren', 'quellenAktualisieren']);
+  }
+
+  function actionRecipesSearch() {
+    openOnly('rezeptSucheBereich');
+    refreshLists();
+    return false;
+  }
+
+  function actionAddRecipe() {
+    openOnly('formularBereich');
+    if (typeof window.formularLeeren === 'function') {
+      try { window.formularLeeren(); } catch (error) { console.warn(error); }
+    }
+    if (typeof window.rf258NormalizeIngredientDeleteButtons === 'function') {
+      setTimeout(window.rf258NormalizeIngredientDeleteButtons, 50);
+    }
+    return false;
+  }
+
+  function actionAllRecipes() {
+    openOnly('sucheBereich');
+    if (typeof window.rf253ShowAllRecipes === 'function') return window.rf253ShowAllRecipes();
+    if (typeof window.filterAnwenden === 'function') return window.filterAnwenden();
+    return false;
+  }
+
+  function actionShoppingList() {
+    openOnly('einkaufBereich');
+    callFunction(['einkaufslisteErstellen', 'einkaufslisteAnzeigen', 'einkaufslisteRendern']);
+    return false;
+  }
+
+  function actionAssistant() {
+    openOnly('textImportBereich');
+    return false;
+  }
+
+  function actionCheckRecipes() {
+    openOnly('datenpruefungBereich');
+    callFunction(['datenqualitaetPruefen', 'datenPruefen', 'rezeptePruefen']);
+    return false;
+  }
+
+  function actionCloudSave() {
+    return callFunction(['cloudSpeichernAlle', 'cloudSpeichernAlleDirekt', 'rf252CloudUploadManualOnly']);
+  }
+
+  function actionCloudLoad() {
+    return callFunction(['cloudLaden', 'cloudHerunterladen', 'ausCloudLaden', 'rf252CloudLoadMerge']);
+  }
+
+  function actionCloudBackups() {
+    if (typeof window.rf257ToggleCloudBackups === 'function') return window.rf257ToggleCloudBackups();
+    return callFunction(['cloudBackupsAnzeigen', 'cloudBackupAnzeigen', 'backupsAnzeigen', 'zeigeCloudBackups']);
+  }
+
+  function actionBackupDownload() {
+    return callFunction(['manuellesBackupHerunterladen', 'backupHerunterladen', 'backupExportieren', 'datenExportieren']);
+  }
+
+  const ACTIONS_BY_ID = {
+    rf207RezepteSuchen: actionRecipesSearch,
+    rf207RezeptHinzufuegen: actionAddRecipe,
+    rf207AlleRezepte: actionAllRecipes,
+    rf207Einkaufsliste: actionShoppingList,
+    rf207RezeptAssistent: actionAssistant,
+    rf207RezeptePruefen: actionCheckRecipes,
+    rf207CloudSpeichern: actionCloudSave,
+    rf207CloudLaden: actionCloudLoad,
+    rf207CloudBackups: actionCloudBackups,
+    rf207BackupDownload: actionBackupDownload
+  };
+
+  const ACTIONS_BY_TEXT = {
+    'rezepte suchen': actionRecipesSearch,
+    'rezept hinzufügen': actionAddRecipe,
+    'rezept hinzufuegen': actionAddRecipe,
+    'alle rezepte anzeigen': actionAllRecipes,
+    'einkaufsliste': actionShoppingList,
+    'rezept-assistent': actionAssistant,
+    'rezepte prüfen': actionCheckRecipes,
+    'rezepte pruefen': actionCheckRecipes,
+    'jetzt in cloud speichern': actionCloudSave,
+    'aus cloud laden': actionCloudLoad,
+    'cloud-backups anzeigen': actionCloudBackups,
+    'cloud-backups ausblenden': actionCloudBackups,
+    'manuelles backup herunterladen': actionBackupDownload
+  };
+
+  function getAction(button) {
+    if (!button) return null;
+    if (button.id && ACTIONS_BY_ID[button.id]) return ACTIONS_BY_ID[button.id];
+    const text = String(button.textContent || '').trim().toLowerCase();
+    return ACTIONS_BY_TEXT[text] || null;
+  }
+
+  function bindDirectly() {
+    Object.keys(ACTIONS_BY_ID).forEach((id) => {
+      const button = $(id);
+      if (!button) return;
+      button.type = 'button';
+      button.disabled = false;
+      button.removeAttribute('disabled');
+      button.onclick = null;
+      button.dataset.rf259StartButton = '1';
+    });
+  }
+
+  document.addEventListener('click', function (event) {
+    const button = event.target && event.target.closest ? event.target.closest('button') : null;
+    const action = getAction(button);
+    if (!action) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    event.stopPropagation();
+    action();
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', bindDirectly);
+  window.addEventListener('load', function () {
+    bindDirectly();
+    setTimeout(bindDirectly, 250);
+    setTimeout(bindDirectly, 900);
+    setTimeout(bindDirectly, 1800);
+  });
+
+  window.rf259StartButtonsDiagnose = function () {
+    const result = {};
+    Object.keys(ACTIONS_BY_ID).forEach((id) => {
+      result[id] = !!$(id);
+    });
+    return result;
+  };
+})();
