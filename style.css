@@ -1226,3 +1226,19 @@ section[hidden] {
   background: #b00020;
   color: #ffffff;
 }
+
+
+/* VERSION 2.71 Startseite */
+.rf271-home-title {
+  cursor: pointer;
+}
+
+body.rf271-startseite #sucheBereich,
+body.rf271-startseite #formularBereich,
+body.rf271-startseite #einkaufBereich,
+body.rf271-startseite #rezeptSucheBereich,
+body.rf271-startseite #textImportBereich,
+body.rf271-startseite #datenpruefungBereich,
+body.rf271-startseite #ergebnisse {
+  display: none !important;
+}

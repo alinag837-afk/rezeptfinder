@@ -35776,3 +35776,89 @@ window.addEventListener("load", function () {
   window.addEventListener('load', normalisiereZutatenButtons);
   window.rf270NormalisiereZutatenButtons = normalisiereZutatenButtons;
 })();
+
+
+/* =====================================================
+   VERSION 2.71 Startseite sauber anzeigen
+   - Klick auf Überschrift führt zur Startseite
+   - Auf der Startseite bleiben nur Übersicht und Startauswahl sichtbar
+   ===================================================== */
+(function rf271StartseiteNurUebersichtUndAuswahl() {
+  function $(id) { return document.getElementById(id); }
+
+  const UNTERBEREICHE = [
+    'sucheBereich',
+    'formularBereich',
+    'einkaufBereich',
+    'rezeptSucheBereich',
+    'textImportBereich',
+    'datenpruefungBereich'
+  ];
+
+  function zeigeStartseite() {
+    UNTERBEREICHE.forEach(function (id) {
+      const el = $(id);
+      if (el) el.classList.add('versteckt');
+    });
+
+    const ergebnisse = $('ergebnisse');
+    if (ergebnisse) {
+      ergebnisse.innerHTML = '';
+      ergebnisse.classList.add('versteckt');
+    }
+
+    const dashboard = $('dashboard');
+    if (dashboard) dashboard.classList.remove('versteckt');
+
+    const startButtons = document.querySelector('.start-buttons');
+    if (startButtons) startButtons.classList.remove('versteckt');
+
+    document.body.classList.add('rf271-startseite');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function markiereNichtStartseite() {
+    document.body.classList.remove('rf271-startseite');
+    const ergebnisse = $('ergebnisse');
+    if (ergebnisse) ergebnisse.classList.remove('versteckt');
+  }
+
+  function vorbereiten() {
+    const titel = $('rf271HomeTitel') || document.querySelector('h1');
+    if (titel && !titel.__rf271HomeBound) {
+      titel.__rf271HomeBound = true;
+      titel.style.cursor = 'pointer';
+      titel.addEventListener('click', function (event) {
+        event.preventDefault();
+        zeigeStartseite();
+      });
+    }
+
+    // Beim ersten Laden keine Unterseiten automatisch offen lassen.
+    zeigeStartseite();
+
+    // Sobald ein Startbutton benutzt wird, darf der Ergebnissebereich wieder sichtbar werden.
+    [
+      'rf207RezepteSuchen',
+      'rf207RezeptHinzufuegen',
+      'rf207AlleRezepte',
+      'rf207Einkaufsliste',
+      'rf207RezeptAssistent',
+      'rf207RezeptePruefen'
+    ].forEach(function (id) {
+      const button = $(id);
+      if (button && !button.__rf271StartButtonBound) {
+        button.__rf271StartButtonBound = true;
+        button.addEventListener('click', markiereNichtStartseite, { capture: true });
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', vorbereiten);
+  } else {
+    vorbereiten();
+  }
+
+  window.rf271ZeigeStartseite = zeigeStartseite;
+})();
