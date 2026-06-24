@@ -1207,27 +1207,13 @@ section[hidden] {
 }
 
 
-/* VERSION 2.66: genau ein Zutaten-Entfernen-Button pro Zeile */
-#zutatenGruppen .zutaten-zeile .rf266-zutat-entfernen,
-#zutatenGruppen .zutat-zeile .rf266-zutat-entfernen {
-  margin-top: 0;
-  background: #b00020;
-  color: #ffffff;
-}
-
-/* VERSION 2.68: Alte X-/Papierkorb-Buttons in Zutatenzeilen ausblenden.
-   Der eigentliche Entfernen-Button wird per script.js als .rf268-zutat-entfernen markiert. */
-#zutatenGruppen .zutaten-zeile button:not(.rf266-zutat-entfernen):not(.rf267-zutat-entfernen):not(.rf268-zutat-entfernen),
-#zutatenGruppen .zutat-zeile button:not(.rf266-zutat-entfernen):not(.rf267-zutat-entfernen):not(.rf268-zutat-entfernen) {
+/* VERSION 2.69: Nur alte Papierkorb-Zutatenbuttons ausblenden.
+   Der funktionierende Entfernen-Button bleibt sichtbar. */
+#zutatenGruppen .rf239-zutat-loeschen,
+#zutatenGruppen .rf241-zutat-loeschen,
+#zutatenGruppen .rf243-zutat-loeschen,
+#zutatenGruppen button.rf241-zutat-loeschen,
+#zutatenGruppen button.rf239-zutat-loeschen,
+#zutatenGruppen button.rf243-zutat-loeschen {
   display: none !important;
-}
-
-#zutatenGruppen .zutaten-zeile .rf268-zutat-entfernen,
-#zutatenGruppen .zutat-zeile .rf268-zutat-entfernen {
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  margin-top: 0;
-  background: #b00020;
-  color: #ffffff;
 }
